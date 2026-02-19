@@ -1,0 +1,14 @@
+{
+  "version": "0.1",
+
+"gates": {
+    "receiver":    true,
+    "preVerifier": true,
+    "dispatcher":  true
+  },
+   "limits": {
+    "max_file_bytes": 32767,
+    "max_compare":    4,
+    "apcu_ttl_sec":   300
+  }
+}
