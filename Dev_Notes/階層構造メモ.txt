@@ -1,0 +1,41 @@
+
+[root]
+│  README.md
+│  
+├─Dev_Notes
+│      階層構造メモ.txt
+│      
+└─src
+    ├─app
+    │  ├─01a_import_norm
+    │  │      .gitkeep
+    │  │      
+    │  ├─01b_import_bulk
+    │  │      .gitkeep
+    │  │      
+    │  ├─02_valid
+    │  │      .gitkeep
+    │  │      
+    │  ├─03a_dispatch
+    │  │      .gitkeep
+    │  │      
+    │  ├─03b_merge
+    │  │      .gitkeep
+    │  │      
+    │  ├─API
+    │  │      config.php
+    │  │      task_master.json
+    │  │      
+    │  ├─console
+    │  │      menu.html
+    │  │      
+    │  ├─mainDB
+    │  │      .gitkeep
+    │  │      
+    │  └─viewer
+    │          .gitkeep
+    │          
+    └─lib
+        └─vendor
+                .gitkeep
+                

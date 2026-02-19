@@ -4,16 +4,17 @@
   "gates": {
     "receive": true,
     "varid_verify": true,
+    "archive": true,
     "dispatch": true,
     "marge_return": true,
     "index_add": true,
     "index_rebuild": true,
-    "build_statistics": true,
+    "build_statistics": true
   },
   "gates_statistics": {
     "take_tag_consolidation": true,
     "personality_stats_prep": true,
-    "make_heatmap": true,
+    "make_heatmap": true
     
 
 

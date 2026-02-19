@@ -1,0 +1,49 @@
+フォルダー パスの一覧
+ボリューム シリアル番号は B86A-75A2 です
+C:.
+│  folder_tree.txt
+│  README.md
+│  
+├─Dev_Notes
+│      階層構造メモ.txt
+│      
+└─src
+    ├─app
+    │  ├─01a_import_norm
+    │  │  │  .gitkeep
+    │  │  │  
+    │  │  └─~temp_260219_153701
+    │  ├─01b_import_bulk
+    │  │      .gitkeep
+    │  │      
+    │  ├─01c_import_raw_arc
+    │  │      Sample.zip
+    │  │      
+    │  ├─02_valid
+    │  │  │  .gitkeep
+    │  │  │  
+    │  │  ├─Confirmed
+    │  │  └─error
+    │  ├─03a_dispatch
+    │  │      .gitkeep
+    │  │      
+    │  ├─03b_merge
+    │  │      .gitkeep
+    │  │      
+    │  ├─API
+    │  │      config.php
+    │  │      task_master.json
+    │  │      
+    │  ├─console
+    │  │      menu.html
+    │  │      
+    │  ├─mainDB
+    │  │      .gitkeep
+    │  │      
+    │  └─viewer
+    │          .gitkeep
+    │          
+    └─lib
+        └─vendor
+                .gitkeep
+                
