@@ -1,4 +1,4 @@
-# MZ-AniCharaDB ほぼ固まりつつある仕様まとめ
+﻿# MZ-AniCharaDB ほぼ固まりつつある仕様まとめ
 作成日: 2026-02-22
 
 ---
@@ -231,5 +231,5 @@ if (!is_gate_open('ゲート名')) { exit(0); }
 3. `first_registered` は旧カードの値を引き継ぐ
 4. `last_updated` は新カード生成日時に更新
 5. 旧カードを mainDB から削除・インデックスから除去
-6. 新カードを `02_valid/Confirmed/` に戻し dispatcher に再処理させる
+6. 新カードを `src/app/03b_merge/M_Confirmed/` 送り dispatcher に再処理させる
 7. 再処理では「該当なし」として `registercache/` 経由でADD登録
