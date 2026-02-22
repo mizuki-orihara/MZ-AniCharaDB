@@ -17,7 +17,7 @@ require_once __DIR__ . '/api/config.php';
 $task_master_path = __DIR__ . '/api/task_master.json';
 $task_master      = json_decode(file_get_contents($task_master_path), true);
 
-if ($task_master['gates']['xxxxx'] !== false) { //「is gate are open?ゲート開いてる？」
+if ($task_master['gates']['xxxxx'] !== false) { //「is gate open?ゲート開いてる？」
     // ゲートが閉まっている → 何もせず正常終了
     // core.phpは「正常終了」として次のモジュールへ進む
     exit(0);
