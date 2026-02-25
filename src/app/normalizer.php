@@ -12,7 +12,7 @@
 
 require_once __DIR__ . '/api/config.php';
 
-// ===== 初期化 =====
+// ===== log・status記録用の初期化 =====
 
 $start_time    = microtime(true);
 $last_file     = '';
