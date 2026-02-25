@@ -1,7 +1,7 @@
 ﻿<?php
 /**
  * dispatcher.php
- * 役割: 02_valid/Confirmed/ および 03b_merge/return/ のカードを
+ * 役割: 02_valid/Confirmed/ および 03b_merge/M_Confirmed/ のカードを
  *       mainDB/index.jsonと照合し振り分ける
  *
  * ゲートが閉まっていたら何もせずexit(0)
@@ -12,16 +12,16 @@
 require_once __DIR__ . '/api/config.php';
 
 // ===== ゲートチェック =====
-// 確認対象: gates内の dispatch と dispatch_merge
+// 確認対象: gates内の dispatch と M_Confirmed
 // 両方falseならexit(0)で終了
-// 作業順は通常dispatch(DISPATCH_DIR)が先、dispatch_merge(DISPATCH_MERGE_DIR)が後
+// 作業順は通常dispatch(DISPATCH_DIR)が先、dispatch_merge(M_Confirmed_DIR)が後
 
 $task_master = json_decode(file_get_contents(__DIR__ . '/api/task_master.json'), true);
 
 $gate_dispatch       = $task_master['gates']['dispatch']       ?? false;
-$gate_dispatch_merge = $task_master['gates']['dispatch_merge'] ?? false;
+$gate_merge_confirmd = $task_master['gates']['merge_confirmd'] ?? false;
 
-if (!$gate_dispatch && !$gate_dispatch_merge) {
+if (!$gate_dispatch && !$gate_merge_confirmd) {
     // 両方のゲートが閉まっている → 何もせず正常終了
     exit(0);
 }
@@ -32,7 +32,7 @@ if ($gate_dispatch) {
     run_dispatch(DISPATCH_DIR);
 }
 
-if ($gate_dispatch_merge) {
+if ($gate_merge_confirmd) {
     run_dispatch(DISPATCH_MERGE_DIR);
 }
 

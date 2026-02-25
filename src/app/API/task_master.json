@@ -6,7 +6,7 @@
     "varid_verify": true,
     "archive": true,
     "dispatch": true,
-    "marge_return": true,
+    "marge_confirmd": true,
     "index_add": true,
     "index_rebuild": true,
     "build_statistics": true
