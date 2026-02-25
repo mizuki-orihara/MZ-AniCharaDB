@@ -2,7 +2,7 @@
 //ノーマライズによって転記の済んだ原本のアーカイブ処理
 // 01a_import_norm/~temp[SID]を、01c_import_raw_arc/へ、~[SID].zipにして保管
 
-require_once __DIR__ . '/api/config.php';
+require_once __DIR__ . '/API/config.php';
 
 //ゲートチェック
 $task_master = json_decode(file_get_contents(TASK_MASTER_JSON), true);
@@ -25,15 +25,19 @@ if (!file_exists($done_list_path)) {
 $status_start_time = microtime(true);
 
 // ループ前（DONE.json読み込みの近く）で一度だけ開く
-$archiver_log_path = __DIR__ . '/api/archiver_log.json';
+$archiver_log_path = __DIR__ . '/API/archiver_log.json';
 $archiver_log = file_exists($archiver_log_path)
     ? json_decode(file_get_contents($archiver_log_path), true) ?? []
     : [];
 
-
-// ▼ EXTEND: 今回の実行で処理した件数・枚数を集計するカウンター（ログ出し実装時に使う）
 $session_count  = 0;
 $total_archived = 0;
+$error_count    = 0;
+
+// 書き出し先ディレクトリの存在確認（なければ作成）
+if (!is_dir(DIR_IMPORT_RAW_ARC)) {
+	mkdir(DIR_IMPORT_RAW_ARC, 0755, true);
+}
 
 $done_list = json_decode(file_get_contents($done_list_path), true);
 $now = time();
@@ -61,15 +65,14 @@ foreach ($done_list as $sid => $timestamp) {
 				$file_count = count(glob($temp_dir . '/*.json'));
 				$done_list[$sid] = [$timestamp, $file_count]; // [タイムスタンプ, 枚数] に更新
 
-				// ▼ EXTEND: archiver_log.json への追記はここ（ZIP名・枚数・日時）
-				
-					// ログエントリ追加　最新が上に来るよう追記して上書き
-					array_unshift($archiver_log, [
-						'timestamp' => date('c'),
-						'sid'       => $sid,
-						'zip_name'  => basename($zip_path),
-						'file_count'=> $file_count
-					]);
+				// ログエントリ追加　最新が上に来るよう追記して上書き
+				array_unshift($archiver_log, [
+					'status'     => 'success',
+					'timestamp'  => date('c'),
+					'sid'        => $sid,
+					'zip_name'   => basename($zip_path),
+					'file_count' => $file_count,
+				]);
 
 				// ディレクトリ削除
 				$iter = new RecursiveIteratorIterator(
@@ -89,7 +92,15 @@ foreach ($done_list as $sid => $timestamp) {
 				$total_archived += $file_count;
 
 			} else {
-				// ▼ EXTEND: zip失敗時のエラーログ出力はここ（api/アーカイブエラー.log）
+				// ZIP失敗 → ~tempは残したままエラーをログに記録
+				$error_count++;
+				array_unshift($archiver_log, [
+					'status'    => 'error',
+					'timestamp' => date('c'),
+					'sid'       => $sid,
+					'zip_name'  => basename($zip_path),
+					'message'   => 'ZipArchive::open() failed. ~temp directory preserved.',
+				]);
 			}
 		}
 	}
@@ -98,13 +109,15 @@ foreach ($done_list as $sid => $timestamp) {
 // 更新されたDONEリストと、アーカイバーの作業ログを保存
 file_put_contents($done_list_path, json_encode($done_list, JSON_PRETTY_PRINT));
 file_put_contents($archiver_log_path, json_encode($archiver_log, JSON_PRETTY_PRINT));
-//アーカイバー自身の作業記録を、api/archiver_status.jsonに保存（直近実行のスナップショット）
-$status_path = __DIR__ . '/api/archiver_status.json';
+
+// アーカイバー自身の作業記録（直近実行のスナップショット）
+$status_path = __DIR__ . '/archiver_status.json';
 $status = [
 	'timestamp'            => date('c'),
 	'archived_sessions'    => $session_count,
 	'total_files_archived' => $total_archived,
+	'error_count'          => $error_count,
 	'processing_time_sec'  => round(microtime(true) - $status_start_time, 2),
-	// ▼ EXTEND: エラー件数など追加ステータスはここ
+	// ▼ EXTEND: 追加ステータスはここ
 ];
 file_put_contents($status_path, json_encode($status, JSON_PRETTY_PRINT));

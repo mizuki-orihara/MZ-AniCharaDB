@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MZ-AniCharaDB | Uploader</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="console-header">
+    <a href="menu.html" class="back-link">← メニューへ</a>
+    <h1>カードアップロード</h1>
+    <div class="session-info">
+        <span class="label">UID</span><span id="display-uid" class="value">--</span>
+        <span class="label">SID</span><span id="display-sid" class="value">--</span>
+        <span class="label">累計</span><span id="display-count" class="value">0</span>枚
+    </div>
+</div>
+
+<main>
+
+    <!-- ドロップゾーン -->
+    <div id="drop-zone" class="drop-zone">
+        <p class="drop-message">JSONファイルをここにドロップ</p>
+        <p class="drop-sub">または <label for="file-input" class="file-label">ファイルを選択</label></p>
+        <input type="file" id="file-input" accept=".json" multiple hidden>
+        <p class="drop-limit">1回あたり最大30ファイル・1024KB</p>
+    </div>
+
+    <!-- 送信前プレビュー -->
+    <div id="preview-area" class="preview-area hidden">
+        <div class="preview-header">
+            <span id="preview-count">0ファイル選択中</span>
+            <span id="preview-size">0 KB</span>
+            <button id="btn-clear" class="btn-secondary">クリア</button>
+            <button id="btn-send" class="btn-primary">送信</button>
+        </div>
+        <ul id="file-list" class="file-list"></ul>
+    </div>
+
+    <!-- 結果ログ -->
+    <div id="log-area" class="log-area">
+        <div class="log-header">
+            <span>送信ログ</span>
+            <button id="btn-clear-log" class="btn-text">クリア</button>
+        </div>
+        <ul id="log-list" class="log-list"></ul>
+    </div>
+
+</main>
+
+<script>
+// ============================================================
+// 定数
+// ============================================================
+const MAX_FILES     = 30;
+const MAX_SIZE_KB   = 1024;
+const MAX_SIZE_BYTE = MAX_SIZE_KB * 1024;
+const SOFT_LIMIT    = 250;
+const RECEIVER_URL  = '../import_Norm.php';
+const UID_URL       = '../API/uid.php';
+
+// ============================================================
+// クッキー管理
+// ============================================================
+function getCookie(name) {
+    return document.cookie.split('; ').reduce((acc, c) => {
+        const [k, v] = c.split('=');
+        return k === name ? decodeURIComponent(v) : acc;
+    }, null);
+}
+
+function setCookie(name, value, sessionOnly = false) {
+    let cookie = `${name}=${encodeURIComponent(value)}; path=/`;
+    if (!sessionOnly) cookie += '; SameSite=Strict';
+    document.cookie = cookie;
+    // sessionOnly=trueの場合はexpires指定なし → ブラウザ閉じたら消える
+}
+
+// ============================================================
+// SID生成（6+6桁 hex）
+// ============================================================
+function generateSid() {
+    const hex = () => Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+    return `${hex()}-${hex()}`;
+}
+
+// ============================================================
+// 初期化：uid・sid のクッキー確認・取得
+// ============================================================
+let sessionCount = 0;
+
+async function init() {
+    // SID: セッションクッキー（ブラウザ閉じたらリセット）
+    let sid = getCookie('sid');
+    if (!sid) {
+        sid = generateSid();
+        setCookie('sid', sid, true);
+    }
+    document.getElementById('display-sid').textContent = sid;
+
+    // UID: サーバーから取得、永続クッキーに保存
+    let uid = getCookie('uid');
+    if (!uid) {
+        try {
+            const res  = await fetch(UID_URL);
+            const data = await res.json();
+            if (data.status === 'ok') {
+                uid = data.uid;
+                setCookie('uid', uid, false);
+            } else {
+                uid = 'ERROR: ' + data.message;
+            }
+        } catch (e) {
+            uid = 'ERROR: 取得失敗';
+        }
+    }
+    document.getElementById('display-uid').textContent = uid;
+}
+
+// ============================================================
+// ファイル選択管理
+// ============================================================
+let selectedFiles = [];
+
+function addFiles(newFiles) {
+    const combined = [...selectedFiles, ...Array.from(newFiles)];
+
+    // 拡張子チェック
+    const invalid = combined.filter(f => !f.name.endsWith('.json'));
+    if (invalid.length > 0) {
+        addLog('error', `JSONファイルのみ対応: ${invalid.map(f => f.name).join(', ')}`);
+        return;
+    }
+
+    // 個数チェック
+    if (combined.length > MAX_FILES) {
+        addLog('error', `1回の送信は${MAX_FILES}ファイルまでです（現在${combined.length}件）`);
+        return;
+    }
+
+    // サイズチェック
+    const totalSize = combined.reduce((acc, f) => acc + f.size, 0);
+    if (totalSize > MAX_SIZE_BYTE) {
+        addLog('error', `総サイズが${MAX_SIZE_KB}KBを超えています（${(totalSize/1024).toFixed(1)}KB）`);
+        return;
+    }
+
+    selectedFiles = combined;
+    renderPreview();
+}
+
+function renderPreview() {
+    const area = document.getElementById('preview-area');
+    const list = document.getElementById('file-list');
+    const countEl = document.getElementById('preview-count');
+    const sizeEl  = document.getElementById('preview-size');
+
+    if (selectedFiles.length === 0) {
+        area.classList.add('hidden');
+        return;
+    }
+
+    area.classList.remove('hidden');
+    countEl.textContent = `${selectedFiles.length}ファイル選択中`;
+    const totalKB = (selectedFiles.reduce((a, f) => a + f.size, 0) / 1024).toFixed(1);
+    sizeEl.textContent  = `${totalKB} KB`;
+
+    list.innerHTML = selectedFiles.map((f, i) =>
+        `<li>
+            <span class="file-name">${f.name}</span>
+            <span class="file-size">${(f.size/1024).toFixed(1)}KB</span>
+            <button class="btn-remove" data-index="${i}">✕</button>
+        </li>`
+    ).join('');
+
+    // 個別削除ボタン
+    list.querySelectorAll('.btn-remove').forEach(btn => {
+        btn.addEventListener('click', () => {
+            selectedFiles.splice(parseInt(btn.dataset.index), 1);
+            renderPreview();
+        });
+    });
+}
+
+// ============================================================
+// 送信処理
+// ============================================================
+async function sendFiles() {
+    if (selectedFiles.length === 0) return;
+
+    const sid = getCookie('sid');
+    const btn = document.getElementById('btn-send');
+    btn.disabled = true;
+    btn.textContent = '送信中…';
+
+    let successCount = 0;
+    let failCount    = 0;
+
+    for (const file of selectedFiles) {
+        try {
+            const body = await file.text();
+            const res  = await fetch(RECEIVER_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type':    'application/json',
+                    'X-File-Name':     encodeURIComponent(file.name),
+                },
+                body: body,
+                credentials: 'include',
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.status === 'success') {
+                successCount++;
+                sessionCount = data.session_count ?? sessionCount + 1;
+                document.getElementById('display-count').textContent = sessionCount;
+
+                if (data.warn_soft_limit) {
+                    addLog('warn', `累計${SOFT_LIMIT}件超え: これ以上の動作は保証外です`);
+                }
+                addLog('success', `${file.name} → 受信OK (SID: ${sid})`);
+            } else {
+                failCount++;
+                addLog('error', `${file.name} → ${data.message ?? 'エラー'} [${res.status}]`);
+            }
+        } catch (e) {
+            failCount++;
+            addLog('error', `${file.name} → 通信エラー: ${e.message}`);
+        }
+    }
+
+    addLog('info', `送信完了: 成功${successCount} / 失敗${failCount}`);
+
+    selectedFiles = [];
+    renderPreview();
+    btn.disabled = false;
+    btn.textContent = '送信';
+}
+
+// ============================================================
+// ログ表示
+// ============================================================
+function addLog(type, message) {
+    const list = document.getElementById('log-list');
+    const li   = document.createElement('li');
+    li.className = `log-${type}`;
+    li.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    list.prepend(li);
+}
+
+// ============================================================
+// イベント登録
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+
+    const dropZone  = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+
+    // ドラッグ＆ドロップ
+    dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        addFiles(e.dataTransfer.files);
+    });
+
+    // ファイル選択
+    fileInput.addEventListener('change', () => {
+        addFiles(fileInput.files);
+        fileInput.value = '';
+    });
+
+    // 送信
+    document.getElementById('btn-send').addEventListener('click', sendFiles);
+
+    // クリア
+    document.getElementById('btn-clear').addEventListener('click', () => {
+        selectedFiles = [];
+        renderPreview();
+    });
+
+    // ログクリア
+    document.getElementById('btn-clear-log').addEventListener('click', () => {
+        document.getElementById('log-list').innerHTML = '';
+    });
+});
+</script>
+
+</body>
+</html>

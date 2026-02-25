@@ -9,14 +9,14 @@
  * エラーはexit(1)
  **/
 
-require_once __DIR__ . '/api/config.php';
+require_once __DIR__ . '/API/config.php';
 
 // ===== ゲートチェック =====
-// 確認対象: gates内の dispatch と M_Confirmed
+// 確認対象: gates内の dispatch と merge_confirmd
 // 両方falseならexit(0)で終了
-// 作業順は通常dispatch(DISPATCH_DIR)が先、dispatch_merge(M_Confirmed_DIR)が後
+// 作業順は通常dispatch(DIR_VALID_CONFIRMED)が先、merge_confirmd(DIR_MERGE_CONF)が後
 
-$task_master = json_decode(file_get_contents(__DIR__ . '/api/task_master.json'), true);
+$task_master = json_decode(file_get_contents(TASK_MASTER_JSON), true);
 
 $gate_dispatch       = $task_master['gates']['dispatch']       ?? false;
 $gate_merge_confirmd = $task_master['gates']['merge_confirmd'] ?? false;
@@ -26,14 +26,45 @@ if (!$gate_dispatch && !$gate_merge_confirmd) {
     exit(0);
 }
 
+// ===== ~discardtemp の準備 =====
+// 起動時に残骸があれば先に削除、新規作成
+if (is_dir(DIR_DISCARD_TEMP)) {
+    $iter = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(DIR_DISCARD_TEMP, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iter as $f) {
+        $f->isDir() ? rmdir($f->getRealPath()) : unlink($f->getRealPath());
+    }
+    rmdir(DIR_DISCARD_TEMP);
+}
+mkdir(DIR_DISCARD_TEMP, 0755, true);
+
+// ===== index.json を一度だけ読み込む =====
+$index = file_exists(INDEX_JSON)
+    ? json_decode(file_get_contents(INDEX_JSON), true) ?? []
+    : [];
+
 // ===== 処理本体 =====
 
 if ($gate_dispatch) {
-    run_dispatch(DISPATCH_DIR);
+    run_dispatch(DIR_VALID_CONFIRMED . '/', $index);
 }
 
 if ($gate_merge_confirmd) {
-    run_dispatch(DISPATCH_MERGE_DIR);
+    run_dispatch(DIR_MERGE_CONF . '/', $index);
+}
+
+// ===== ~discardtemp を処理完了後に削除 =====
+if (is_dir(DIR_DISCARD_TEMP)) {
+    $iter = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(DIR_DISCARD_TEMP, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    foreach ($iter as $f) {
+        $f->isDir() ? rmdir($f->getRealPath()) : unlink($f->getRealPath());
+    }
+    rmdir(DIR_DISCARD_TEMP);
 }
 
 exit(0);
@@ -44,12 +75,7 @@ exit(0);
  * 指定ディレクトリのカードをindex.jsonと照合して振り分ける
  * 読み込みディレクトリ以外の処理はすべて共通
  */
-function run_dispatch(string $read_dir): void {
-
-    // index.jsonを読み込む（なければ空配列）
-    $index = file_exists(INDEX_JSON)
-        ? json_decode(file_get_contents(INDEX_JSON), true) ?? []
-        : [];
+function run_dispatch(string $read_dir, array $index): void {
 
     // 対象ディレクトリのJSONを1枚ずつ処理
     $files = glob($read_dir . '*.json');
@@ -72,36 +98,18 @@ function run_dispatch(string $read_dir): void {
 
         if (!isset($index[$card_id])) {
             // ===== 一致せず → 新規 =====
-            copy($file, REGISTERCACHE_DIR . basename($file));
+            copy($file, DIR_REGISTERCACHE . '/' . basename($file));
             unlink($file);
 
         } elseif ($index[$card_id] === $hash) {
-            // ===== 完全一致 → 破棄待ち =====
-            log_discard($file);
+            // ===== 完全一致 → ~discartemp に退避後、元ファイル削除 =====
+            copy($file, DIR_DISCARD_TEMP . '/' . basename($file));
             unlink($file);
 
         } else {
             // ===== 部分一致（card_id一致・hash不一致）→ マージ待ち =====
-            copy($file, MERGE_DIR . basename($file));
+            copy($file, DIR_MERGE . '/' . basename($file));
             unlink($file);
         }
     }
-}
-
-/**
- * 破棄待ちリストに記録する
- * リスト形式は未定・暫定実装
- */
-function log_discard(string $file): void {
-    // TODO: 破棄待ちリストのファイル形式確定後に実装
-    $entry = [
-        'file'         => basename($file),
-        'discarded_at' => date('Y-m-d\TH:i:s\Z')
-    ];
-    $log_path = DISCARD_LOG;  // config.phpで定数化想定
-    $log = file_exists($log_path)
-        ? json_decode(file_get_contents($log_path), true) ?? []
-        : [];
-    $log[] = $entry;
-    file_put_contents($log_path, json_encode($log, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 }
