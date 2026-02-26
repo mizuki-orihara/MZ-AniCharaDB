@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MZ-AniCharaDB | カード作成</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=DM+Mono:wght@400;500&family=Playfair+Display:ital@1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #f5f4f0;
+    --surface:   #ffffff;
+    --border:    #e2dfd8;
+    --border-strong: #c8c4bc;
+    --text:      #1a1916;
+    --text-mid:  #5a5750;
+    --text-soft: #9a9690;
+    --accent:    #3d6b8e;
+    --accent-light: #e8f0f6;
+    --required:  #c0392b;
+    --recommended: #2e7d5e;
+    --tag-bg:    #eeecea;
+    --mono:      'DM Mono', monospace;
+    --sans:      'Noto Sans JP', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ヘッダー */
+  .page-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .page-header .logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-soft);
+    letter-spacing: 0.05em;
+  }
+  .page-header h1 {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .page-header .schema-badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-soft);
+    background: var(--tag-bg);
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+
+  /* メインレイアウト */
+  .main {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 40px 24px 120px;
+  }
+
+  /* セクション */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #faf9f7;
+  }
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    text-transform: uppercase;
+  }
+  .section-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* フィールドラベル */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-mid);
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* 必須・推奨バッジ */
+  .badge {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 5px;
+    border-radius: 2px;
+    font-weight: 400;
+  }
+  .badge-required {
+    background: #fdecea;
+    color: var(--required);
+    border: 1px solid #f5c6c2;
+  }
+  .badge-recommended {
+    background: #e8f4f0;
+    color: var(--recommended);
+    border: 1px solid #b8ddd0;
+  }
+  .badge-optional {
+    background: var(--tag-bg);
+    color: var(--text-soft);
+    border: 1px solid var(--border);
+  }
+
+  /* 入力フィールド */
+  input[type="text"],
+  input[type="date"],
+  input[type="number"],
+  select,
+  textarea {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    font-family: var(--sans);
+    font-size: 14px;
+    color: var(--text);
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(61,107,142,0.1);
+  }
+  textarea { resize: vertical; min-height: 72px; }
+
+  /* 公式設定フィールド（値＋チェックボックスのペア） */
+  .official-field {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+  }
+  .official-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--text-mid);
+    cursor: pointer;
+  }
+  .official-check input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  /* タグ入力 */
+  .tag-input-area {
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: 8px 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 44px;
+    cursor: text;
+    background: var(--surface);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .tag-input-area:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(61,107,142,0.1);
+  }
+  .tag {
+    background: var(--accent-light);
+    color: var(--accent);
+    border: 1px solid #c0d8ec;
+    border-radius: 3px;
+    padding: 2px 8px 2px 10px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tag-remove {
+    cursor: pointer;
+    color: var(--accent);
+    opacity: 0.6;
+    font-size: 14px;
+    line-height: 1;
+    background: none;
+    border: none;
+    padding: 0;
+  }
+  .tag-remove:hover { opacity: 1; }
+  .tag-input {
+    border: none;
+    outline: none;
+    font-size: 13px;
+    min-width: 100px;
+    flex: 1;
+    background: transparent;
+    color: var(--text);
+  }
+
+  /* スライダー（性格軸） */
+  .axis-item {
+    display: grid;
+    grid-template-columns: 80px 1fr 80px;
+    align-items: center;
+    gap: 12px;
+  }
+  .axis-label {
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+  .axis-label.right { text-align: right; }
+  .axis-slider-wrap {
+    position: relative;
+  }
+  input[type="range"] {
+    width: 100%;
+    height: 4px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .axis-values {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-soft);
+    margin-top: 3px;
+  }
+
+  /* 主観評価（星） */
+  .rating-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .rating-item {
+    position: relative;
+  }
+  .rating-item label {
+    margin-bottom: 6px;
+  }
+  .rating-item .remove-rating {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    font-size: 13px;
+    border: none;
+    background: none;
+    color: var(--text-soft);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .rating-item .remove-rating:hover {
+    background: #fdecea;
+    color: var(--required);
+  }
+  .rating-item.custom-rating input[type="text"] {
+    font-size: 12px;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+  }
+  .stars {
+    display: flex;
+    gap: 4px;
+  }
+  .star {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    color: var(--border-strong);
+    font-size: 20px;
+    transition: color 0.1s;
+    user-select: none;
+  }
+  .star.active { color: #e8a020; }
+
+  /* カスタムフィールド（+/-） */
+  .custom-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .custom-field-row {
+    display: grid;
+    grid-template-columns: 160px 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn-icon {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text-mid);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: background 0.15s, border-color 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-icon:hover { background: var(--tag-bg); border-color: var(--accent); color: var(--accent); }
+  .btn-icon.remove:hover { background: #fdecea; border-color: var(--required); color: var(--required); }
+
+  .btn-add-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--accent);
+    background: none;
+    border: 1px dashed #a0c4df;
+    border-radius: 4px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    width: 100%;
+  }
+  .btn-add-row:hover { background: var(--accent-light); }
+
+  /* コメント */
+  .comment-block {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #faf9f7;
+  }
+  .comment-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-soft);
+  }
+
+  /* 送信エリア */
+  .submit-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    z-index: 100;
+  }
+  .btn-secondary {
+    padding: 9px 20px;
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text-mid);
+    font-size: 13px;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: background 0.15s;
+  }
+  .btn-secondary:hover { background: var(--tag-bg); }
+  .btn-primary {
+    padding: 9px 24px;
+    border: none;
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: opacity 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.88; }
+
+  /* ディバイダー */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 0;
+  }
+
+  /* extended ブロック */
+  .extended-block {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .extended-block-header {
+    background: var(--tag-bg);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .extended-block-header input {
+    border: none;
+    background: transparent;
+    font-weight: 500;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    flex: 1;
+  }
+  .extended-block-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .extended-param-row {
+    display: grid;
+    grid-template-columns: 140px 80px 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+  .param-value-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .param-max {
+    font-size: 12px;
+    color: var(--text-soft);
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <span class="logo">MZ-AniCharaDB</span>
+  <h1>キャラクターカード作成</h1>
+  <span class="schema-badge">schema v1.0</span>
+</header>
+
+<main class="main">
+
+  <!-- 基本情報 -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">基本情報</span>
+    </div>
+    <div class="section-body">
+      <div class="field-row">
+        <div class="field">
+          <label>作品名 <span class="badge badge-required">必須</span></label>
+          <input type="text" placeholder="例：Just Because!">
+        </div>
+        <div class="field">
+          <label>キャラクター名 <span class="badge badge-required">必須</span></label>
+          <input type="text" placeholder="例：小宮恵那">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>名前読み <span class="badge badge-recommended">推奨</span></label>
+          <input type="text" placeholder="例：こみや えな">
+        </div>
+        <div class="field">
+          <label>派生枝番 <span class="badge badge-required">必須</span></label>
+          <input type="text" placeholder="例：001" style="font-family: var(--mono);">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- プロフィール（公式設定） -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">プロフィール</span>
+    </div>
+    <div class="section-body">
+      <div class="field-row">
+        <div class="field">
+          <label>生年月日 <span class="badge badge-recommended">推奨</span></label>
+          <div class="official-field">
+            <input type="text" placeholder="yyyy/mm/dd">
+            <label class="official-check"><input type="checkbox"> 公式設定</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>血液型 <span class="badge badge-optional">任意</span></label>
+          <div class="official-field">
+            <select>
+              <option value="">---</option>
+              <option>A型</option><option>B型</option><option>O型</option><option>AB型</option>
+            </select>
+            <label class="official-check"><input type="checkbox"> 公式設定</label>
+          </div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>身長 (cm) <span class="badge badge-recommended">推奨</span></label>
+          <div class="official-field">
+            <input type="number" placeholder="---">
+            <label class="official-check"><input type="checkbox"> 公式設定</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>体重 (kg) <span class="badge badge-recommended">推奨</span></label>
+          <div class="official-field">
+            <input type="number" placeholder="---">
+            <label class="official-check"><input type="checkbox"> 公式設定</label>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <!-- カスタムフィールド -->
+      <div class="field">
+        <label>カスタムフィールド <span class="badge badge-optional">任意</span></label>
+        <div class="custom-fields" id="custom-fields">
+          <div class="custom-field-row">
+            <input type="text" placeholder="ラベル（例：学年）" value="学年">
+            <input type="text" placeholder="値" value="高校2年生">
+            <label class="official-check" style="white-space:nowrap"><input type="checkbox" checked> 公式</label>
+            <button class="btn-icon remove" onclick="removeRow(this)">×</button>
+          </div>
+          <div class="custom-field-row">
+            <input type="text" placeholder="ラベル" value="所属部活">
+            <input type="text" placeholder="値" value="写真部">
+            <label class="official-check" style="white-space:nowrap"><input type="checkbox" checked> 公式</label>
+            <button class="btn-icon remove" onclick="removeRow(this)">×</button>
+          </div>
+        </div>
+        <button class="btn-add-row" onclick="addCustomField()">＋ フィールドを追加</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- タグ -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">タグ</span>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label>所属タグ <span class="badge badge-recommended">推奨</span></label>
+        <div class="tag-input-area" id="affiliation-tags" onclick="focusTagInput('affil-input')">
+          <span class="tag">椚ヶ丘高等学校<button class="tag-remove" onclick="removeTag(this)">×</button></span>
+          <input class="tag-input" id="affil-input" placeholder="入力してEnterで追加" onkeydown="addTag(event, 'affiliation-tags', 'affil-input')">
+        </div>
+      </div>
+      <div class="field">
+        <label>キャラメタタグ <span class="badge badge-recommended">推奨</span></label>
+        <div class="tag-input-area" id="meta-tags" onclick="focusTagInput('meta-input')">
+          <span class="tag">ショートカット<button class="tag-remove" onclick="removeTag(this)">×</button></span>
+          <span class="tag">自由奔放<button class="tag-remove" onclick="removeTag(this)">×</button></span>
+          <span class="tag">負けヒロイン<button class="tag-remove" onclick="removeTag(this)">×</button></span>
+          <span class="tag">カメラ女子<button class="tag-remove" onclick="removeTag(this)">×</button></span>
+          <input class="tag-input" id="meta-input" placeholder="入力してEnterで追加" onkeydown="addTag(event, 'meta-tags', 'meta-input')">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 主観評価 -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">主観評価</span>
+    </div>
+    <div class="section-body">
+      <div class="rating-grid" id="rating-grid">
+        <div class="rating-item">
+          <label>外観 <span class="badge badge-recommended">推奨</span></label>
+          <div class="stars" data-rating="2">
+            <span class="star active" onclick="setRating(this,1)">★</span>
+            <span class="star active" onclick="setRating(this,2)">★</span>
+            <span class="star" onclick="setRating(this,3)">★</span>
+            <span class="star" onclick="setRating(this,4)">★</span>
+            <span class="star" onclick="setRating(this,5)">★</span>
+          </div>
+        </div>
+        <div class="rating-item">
+          <label>性格 <span class="badge badge-recommended">推奨</span></label>
+          <div class="stars" data-rating="5">
+            <span class="star active" onclick="setRating(this,1)">★</span>
+            <span class="star active" onclick="setRating(this,2)">★</span>
+            <span class="star active" onclick="setRating(this,3)">★</span>
+            <span class="star active" onclick="setRating(this,4)">★</span>
+            <span class="star active" onclick="setRating(this,5)">★</span>
+          </div>
+        </div>
+        <div class="rating-item">
+          <label>環境背景 <span class="badge badge-recommended">推奨</span></label>
+          <div class="stars" data-rating="3">
+            <span class="star active" onclick="setRating(this,1)">★</span>
+            <span class="star active" onclick="setRating(this,2)">★</span>
+            <span class="star active" onclick="setRating(this,3)">★</span>
+            <span class="star" onclick="setRating(this,4)">★</span>
+            <span class="star" onclick="setRating(this,5)">★</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn-add-row" onclick="addRatingItem()" style="margin-top:4px;">＋ 評価項目を追加</button>
+    </div>
+  </section>
+
+  <!-- 性格軸評価 -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">性格軸評価</span>
+      <span style="font-size:11px; color:var(--text-soft); margin-left:auto;">合計 10.0</span>
+    </div>
+    <div class="section-body">
+      <div id="axes">
+        <div class="axis-item" style="margin-bottom:14px;">
+          <span class="axis-label">社交的</span>
+          <div class="axis-slider-wrap">
+            <input type="range" min="0" max="10" step="0.5" value="8.5" oninput="updateAxis(this)">
+            <div class="axis-values"><span class="left-val">8.5</span><span class="right-val">1.5</span></div>
+          </div>
+          <span class="axis-label right">内向的</span>
+        </div>
+        <div class="axis-item" style="margin-bottom:14px;">
+          <span class="axis-label">行動的</span>
+          <div class="axis-slider-wrap">
+            <input type="range" min="0" max="10" step="0.5" value="9.2" oninput="updateAxis(this)">
+            <div class="axis-values"><span class="left-val">9.2</span><span class="right-val">0.8</span></div>
+          </div>
+          <span class="axis-label right">慎重</span>
+        </div>
+        <div class="axis-item" style="margin-bottom:14px;">
+          <span class="axis-label">直感的</span>
+          <div class="axis-slider-wrap">
+            <input type="range" min="0" max="10" step="0.5" value="7.0" oninput="updateAxis(this)">
+            <div class="axis-values"><span class="left-val">7.0</span><span class="right-val">3.0</span></div>
+          </div>
+          <span class="axis-label right">論理的</span>
+        </div>
+        <div class="axis-item" style="margin-bottom:14px;">
+          <span class="axis-label">情緒的</span>
+          <div class="axis-slider-wrap">
+            <input type="range" min="0" max="10" step="0.5" value="6.5" oninput="updateAxis(this)">
+            <div class="axis-values"><span class="left-val">6.5</span><span class="right-val">3.5</span></div>
+          </div>
+          <span class="axis-label right">理性的</span>
+        </div>
+        <div class="axis-item">
+          <span class="axis-label">楽観的</span>
+          <div class="axis-slider-wrap">
+            <input type="range" min="0" max="10" step="0.5" value="7.5" oninput="updateAxis(this)">
+            <div class="axis-values"><span class="left-val">7.5</span><span class="right-val">2.5</span></div>
+          </div>
+          <span class="axis-label right">悲観的</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 拡張パラメーター -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">拡張パラメーター</span>
+      <span style="font-size:11px; color:var(--text-soft); margin-left:auto;">任意・作品固有</span>
+    </div>
+    <div class="section-body">
+      <div id="extended-blocks"></div>
+      <button class="btn-add-row" onclick="addExtendedBlock()">＋ パラメーターブロックを追加</button>
+    </div>
+  </section>
+
+  <!-- 作品情報 -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">作品情報</span>
+    </div>
+    <div class="section-body">
+      <div class="custom-fields" id="product-fields">
+        <div class="custom-field-row">
+          <input type="text" value="アニメ制作">
+          <input type="text" value="PINE JAM">
+          <label class="official-check" style="visibility:hidden"><input type="checkbox"> 公式</label>
+          <button class="btn-icon remove" onclick="removeRow(this)">×</button>
+        </div>
+        <div class="custom-field-row">
+          <input type="text" value="担当声優">
+          <input type="text" value="Lynn">
+          <label class="official-check" style="visibility:hidden"><input type="checkbox"> 公式</label>
+          <button class="btn-icon remove" onclick="removeRow(this)">×</button>
+        </div>
+      </div>
+      <button class="btn-add-row" onclick="addProductField()">＋ 項目を追加</button>
+    </div>
+  </section>
+
+  <!-- コメント -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-title">コメント</span>
+    </div>
+    <div class="section-body">
+      <div class="field">
+        <label>紹介文 <span class="badge badge-recommended">推奨</span></label>
+        <textarea placeholder="キャラクターの簡単な紹介を記入">廃部寸前の写真部を救うべく、ベストショットを求めて奔走する活発な後輩。</textarea>
+      </div>
+      <hr class="divider">
+      <div class="field">
+        <label>評価コメント <span class="badge badge-optional">任意</span></label>
+        <div class="custom-fields" id="eval-comments">
+          <div class="comment-block">
+            <textarea placeholder="コメント内容">写真部存続のため奔走し、瑛太に惹かれていくも報われぬ恋に終わる。</textarea>
+            <div class="comment-meta">
+              <input type="text" placeholder="author_uuid（省略可）" style="width:260px; font-family:var(--mono); font-size:11px;">
+              <button class="btn-icon remove" style="margin-left:auto;" onclick="removeRow(this)">×</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn-add-row" onclick="addComment()" style="margin-top:6px;">＋ コメントを追加</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- JSONプレビューモーダル -->
+<div id="preview-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:200; align-items:center; justify-content:center;">
+  <div style="background:var(--surface); border-radius:8px; width:min(720px,92vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,0.18);">
+    <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center;">
+      <span style="font-size:13px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;">JSON プレビュー</span>
+      <button onclick="closePreview()" style="margin-left:auto; background:none; border:none; font-size:22px; color:var(--text-soft); cursor:pointer; line-height:1;">×</button>
+    </div>
+    <pre id="preview-content" style="overflow:auto; padding:20px; font-family:var(--mono); font-size:12px; line-height:1.7; color:var(--text); margin:0; flex:1;"></pre>
+    <div style="padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:10px;">
+      <button class="btn-secondary" onclick="closePreview()">閉じる</button>
+      <button class="btn-primary" onclick="downloadJSON()">このJSONをダウンロード</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト通知 -->
+<div id="toast" style="display:none; position:fixed; top:24px; left:50%; transform:translateX(-50%); padding:10px 20px; border-radius:4px; font-size:13px; z-index:300; box-shadow:0 4px 16px rgba(0,0,0,0.2); pointer-events:none;"></div>
+
+<div class="submit-bar">
+  <button class="btn-secondary" onclick="resetForm()">リセット</button>
+  <button class="btn-secondary" onclick="openPreview()">JSONプレビュー</button>
+  <button class="btn-primary" onclick="downloadJSON()">ダウンロード</button>
+</div>
+
+<script>
+  // ===== UI操作系 =====
+
+  function updateAxis(input) {
+    const val = parseFloat(input.value);
+    const wrap = input.closest('.axis-slider-wrap');
+    wrap.querySelector('.left-val').textContent = val.toFixed(1);
+    wrap.querySelector('.right-val').textContent = (10 - val).toFixed(1);
+  }
+
+  function setRating(star, value) {
+    const stars = star.closest('.stars');
+    stars.querySelectorAll('.star').forEach((s, i) => {
+      s.classList.toggle('active', i < value);
+    });
+  }
+
+  function addTag(event, containerId, inputId) {
+    if (event.key !== 'Enter') return;
+    const input = document.getElementById(inputId);
+    const val = input.value.trim();
+    if (!val) return;
+    const container = document.getElementById(containerId);
+    const tag = document.createElement('span');
+    tag.className = 'tag';
+    tag.innerHTML = val + '<button class="tag-remove" onclick="removeTag(this)">×</button>';
+    container.insertBefore(tag, input);
+    input.value = '';
+    event.preventDefault();
+  }
+
+  function removeTag(btn) { btn.closest('.tag').remove(); }
+  function focusTagInput(id) { document.getElementById(id).focus(); }
+
+  function removeRow(btn) {
+    const target = btn.closest('.custom-field-row') ||
+                   btn.closest('.comment-block') ||
+                   btn.closest('.extended-param-row');
+    if (target) target.remove();
+  }
+
+  function addCustomField() {
+    const container = document.getElementById('custom-fields');
+    const row = document.createElement('div');
+    row.className = 'custom-field-row';
+    row.innerHTML = '<input type="text" placeholder="ラベル"><input type="text" placeholder="値"><label class="official-check" style="white-space:nowrap"><input type="checkbox"> 公式</label><button class="btn-icon remove" onclick="removeRow(this)">×</button>';
+    container.appendChild(row);
+  }
+
+  function addProductField() {
+    const container = document.getElementById('product-fields');
+    const row = document.createElement('div');
+    row.className = 'custom-field-row';
+    row.innerHTML = '<input type="text" placeholder="項目名"><input type="text" placeholder="値"><label class="official-check" style="visibility:hidden"><input type="checkbox"></label><button class="btn-icon remove" onclick="removeRow(this)">×</button>';
+    container.appendChild(row);
+  }
+
+  function addComment() {
+    const container = document.getElementById('eval-comments');
+    const block = document.createElement('div');
+    block.className = 'comment-block';
+    block.innerHTML = '<textarea placeholder="コメント内容"></textarea><div class="comment-meta"><input type="text" placeholder="author_uuid（省略可）" style="width:260px; font-family:var(--mono); font-size:11px;"><button class="btn-icon remove" style="margin-left:auto;" onclick="removeRow(this)">×</button></div>';
+    container.appendChild(block);
+  }
+
+  function addRatingItem() {
+    const grid = document.getElementById('rating-grid');
+    const item = document.createElement('div');
+    item.className = 'rating-item custom-rating';
+    item.innerHTML =
+      '<button class="remove-rating" onclick="this.closest(\'.rating-item\').remove()">×</button>' +
+      '<input type="text" placeholder="項目名（例：戦闘力）">' +
+      '<div class="stars">' +
+      [1,2,3,4,5].map(i => '<span class="star" onclick="setRating(this,' + i + ')">★</span>').join('') +
+      '</div>';
+    grid.appendChild(item);
+  }
+
+  function addExtendedBlock() {
+    const container = document.getElementById('extended-blocks');
+    const block = document.createElement('div');
+    block.className = 'extended-block';
+    block.innerHTML =
+      '<div class="extended-block-header">' +
+      '<input type="text" placeholder="ブロック名（例：キャンプスキル）">' +
+      '<button class="btn-icon remove" onclick="this.closest(\'.extended-block\').remove()">×</button>' +
+      '</div>' +
+      '<div class="extended-block-body">' +
+      '<div class="extended-params"></div>' +
+      '<button class="btn-add-row" onclick="addExtendedParam(this)">＋ パラメーターを追加</button>' +
+      '</div>';
+    container.appendChild(block);
+  }
+
+  function addExtendedParam(btn) {
+    const container = btn.previousElementSibling;
+    const row = document.createElement('div');
+    row.className = 'extended-param-row';
+    row.innerHTML =
+      '<input type="text" placeholder="項目名（例：料理）">' +
+      '<input type="number" placeholder="0.0" min="0" max="10" step="0.5">' +
+      '<input type="range" min="0" max="10" step="0.5" value="5" style="height:4px; accent-color:var(--accent);">' +
+      '<button class="btn-icon remove" onclick="removeRow(this)">×</button>';
+    const rangeInput = row.querySelector('input[type=range]');
+    const numInput = row.querySelector('input[type=number]');
+    rangeInput.oninput = function() { numInput.value = rangeInput.value; };
+    numInput.oninput = function() { rangeInput.value = numInput.value; };
+    container.appendChild(row);
+  }
+
+  // ===== JSON組み立て =====
+
+  function buildJSON() {
+    const now = new Date().toISOString();
+    const sections = document.querySelectorAll('.section');
+
+    // 基本情報
+    const basicInputs = sections[0].querySelectorAll('input[type=text], input[type=number]');
+    const work     = basicInputs[0].value.trim();
+    const name     = basicInputs[1].value.trim();
+    const nameRead = basicInputs[2].value.trim();
+    const branch   = basicInputs[3].value.trim() || '001';
+
+    // プロフィール固定フィールド
+    function getOfficialField(el) {
+      const inp = el.querySelector('input[type=text], input[type=number], select');
+      const raw = inp ? inp.value.trim() : '';
+      const chk = el.querySelector('input[type=checkbox]');
+      const isOfficial = chk ? chk.checked : false;
+      const value = (raw === '' || raw === '---') ? null : isNaN(raw) ? raw : parseFloat(raw);
+      return { value, is_official: isOfficial };
+    }
+    const officialFields = sections[1].querySelectorAll('.official-field');
+    const birthday  = getOfficialField(officialFields[0]);
+    const bloodType = getOfficialField(officialFields[1]);
+    const heightCm  = getOfficialField(officialFields[2]);
+    const weightKg  = getOfficialField(officialFields[3]);
+
+    // カスタムフィールド
+    const customFields = [];
+    document.querySelectorAll('#custom-fields .custom-field-row').forEach(function(row) {
+      const ins = row.querySelectorAll('input');
+      const label = ins[0].value.trim();
+      const value = ins[1].value.trim();
+      const chk = ins[2];
+      if (label) customFields.push({ label, value: value || null, is_official: chk ? chk.checked : false });
+    });
+
+    // タグ
+    const affiliations = Array.from(document.querySelectorAll('#affiliation-tags .tag')).map(function(t) {
+      return t.textContent.replace('×','').trim();
+    });
+    const characterTags = Array.from(document.querySelectorAll('#meta-tags .tag')).map(function(t) {
+      return t.textContent.replace('×','').trim();
+    });
+
+    // 主観評価
+    const rating = {};
+    document.querySelectorAll('#rating-grid .rating-item').forEach(function(item) {
+      const customInput = item.querySelector('input[type=text]');
+      let key;
+      if (customInput) {
+        key = customInput.value.trim();
+      } else {
+        const lbl = item.querySelector('label');
+        key = lbl ? lbl.childNodes[0].textContent.trim() : '';
+      }
+      const activeStars = item.querySelectorAll('.star.active').length;
+      if (key) rating[key] = activeStars;
+    });
+
+    // 性格軸
+    const personalityParams = {};
+    document.querySelectorAll('#axes .axis-item').forEach(function(item, i) {
+      const labels = [
+        item.querySelector('.axis-label:first-child').textContent.trim(),
+        item.querySelector('.axis-label.right').textContent.trim()
+      ];
+      const leftVal  = parseFloat(item.querySelector('.left-val').textContent);
+      const rightVal = parseFloat(item.querySelector('.right-val').textContent);
+      personalityParams['軸' + (i + 1)] = { labels, values: [leftVal, rightVal], anchor: 0 };
+    });
+
+    // 拡張パラメーター
+    const extended = {};
+    document.querySelectorAll('.extended-block').forEach(function(block) {
+      const blockName = block.querySelector('.extended-block-header input').value.trim();
+      if (!blockName) return;
+      const params = {};
+      block.querySelectorAll('.extended-param-row').forEach(function(row) {
+        const ins = row.querySelectorAll('input');
+        const paramName = ins[0].value.trim();
+        const paramVal  = parseFloat(ins[1].value) || 0;
+        if (paramName) params[paramName] = paramVal;
+      });
+      extended[blockName] = params;
+    });
+
+    // 作品情報
+    const product = {};
+    document.querySelectorAll('#product-fields .custom-field-row').forEach(function(row) {
+      const ins = row.querySelectorAll('input');
+      const key = ins[0].value.trim();
+      const val = ins[1].value.trim();
+      if (key) product[key] = val || null;
+    });
+
+    // コメント
+    const allTextareas = document.querySelectorAll('.section:last-of-type .section-body > .field > textarea');
+    const intro = allTextareas[0] ? [allTextareas[0].value.trim()].filter(Boolean) : [];
+    const evaluation = [];
+    document.querySelectorAll('#eval-comments .comment-block').forEach(function(block) {
+      const content = block.querySelector('textarea').value.trim();
+      const author  = block.querySelector('input[type=text]').value.trim();
+      if (content) evaluation.push({ content, author_uuid: author || null });
+    });
+
+    return {
+      header: {
+        schema: '1.0',
+        uuid: generateUUID(),
+        content_hash: null,   // normalizer.phpが計算
+        generated_at: now,
+        branch: branch,
+        work: work,
+        name: name,
+      },
+      name,
+      work,
+      profile: {
+        name_reading: nameRead || null,
+        height_cm: heightCm,
+        weight_kg: weightKg,
+        birthday,
+        blood_type: bloodType,
+        custom_fields: customFields
+      },
+      product,
+      tags: {
+        affiliations: affiliations,
+        character_tags: characterTags
+      },
+      rating,
+      personality_parameters: personalityParams,
+      extended,
+      assets: [],
+      comments: { intro, evaluation }
+    };
+  }
+
+  // ===== UUID v4生成 =====
+
+  function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
+  // ===== バリデーション =====
+
+  function validate(card) {
+    const errors = [];
+    if (!card.name) errors.push('キャラクター名は必須です');
+    if (!card.work) errors.push('作品名は必須です');
+    return errors;
+  }
+
+  // ===== トースト =====
+
+  function showToast(msg, isError) {
+    if (isError === undefined) isError = true;
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.style.background = isError ? '#c0392b' : '#2e7d5e';
+    toast.style.color = '#fff';
+    toast.style.display = 'block';
+    setTimeout(function() { toast.style.display = 'none'; }, 3000);
+  }
+
+  // ===== プレビュー =====
+
+  function openPreview() {
+    const card = buildJSON();
+    const errors = validate(card);
+    if (errors.length) { showToast(errors[0]); return; }
+    document.getElementById('preview-content').textContent = JSON.stringify(card, null, 2);
+    document.getElementById('preview-modal').style.display = 'flex';
+  }
+
+  function closePreview() {
+    document.getElementById('preview-modal').style.display = 'none';
+  }
+
+  document.getElementById('preview-modal').addEventListener('click', function(e) {
+    if (e.target === this) closePreview();
+  });
+
+  // ===== ダウンロード =====
+
+  function downloadJSON() {
+    const card = buildJSON();
+    const errors = validate(card);
+    if (errors.length) { showToast(errors[0]); return; }
+
+    const workSafe   = card.work.replace(/[\\/:*?"<>|]/g, '_');
+    const nameSafe   = card.name.replace(/[\\/:*?"<>|]/g, '_');
+    const branch     = document.querySelectorAll('.section')[0].querySelectorAll('input')[3].value.trim() || '001';
+    const now        = new Date();
+    const stamp      = now.getFullYear().toString().slice(2) +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') + '_' +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0');
+    const filename   = workSafe + '_' + nameSafe + '_' + branch + '_' + stamp + '.json';
+
+    const blob = new Blob([JSON.stringify(card, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+
+    closePreview();
+    showToast('保存: ' + filename, false);
+  }
+
+  // ===== リセット =====
+
+  function resetForm() {
+    if (!confirm('入力内容をリセットしますか？')) return;
+    location.reload();
+  }
+</script>
+</body>
+</html>

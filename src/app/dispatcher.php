@@ -40,6 +40,11 @@ if (is_dir(DIR_DISCARD_TEMP)) {
 }
 mkdir(DIR_DISCARD_TEMP, 0755, true);
 
+// ===== 書き出し先ディレクトリの準備（なければ作る） =====
+foreach ([DIR_REGISTERCACHE, DIR_MERGE] as $dir) {
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+}
+
 // ===== index.json を一度だけ読み込む =====
 $index = file_exists(INDEX_JSON)
     ? json_decode(file_get_contents(INDEX_JSON), true) ?? []
@@ -98,8 +103,9 @@ function run_dispatch(string $read_dir, array $index): void {
 
         if (!isset($index[$card_id])) {
             // ===== 一致せず → 新規 =====
-            copy($file, DIR_REGISTERCACHE . '/' . basename($file));
-            unlink($file);
+            if (copy($file, DIR_REGISTERCACHE . '/' . basename($file))) {
+                unlink($file);
+            }
 
         } elseif ($index[$card_id] === $hash) {
             // ===== 完全一致 → ~discartemp に退避後、元ファイル削除 =====
@@ -108,8 +114,9 @@ function run_dispatch(string $read_dir, array $index): void {
 
         } else {
             // ===== 部分一致（card_id一致・hash不一致）→ マージ待ち =====
-            copy($file, DIR_MERGE . '/' . basename($file));
-            unlink($file);
+            if (copy($file, DIR_MERGE . '/' . basename($file))) {
+                unlink($file);
+            }
         }
     }
 }
