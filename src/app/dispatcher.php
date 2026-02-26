@@ -105,6 +105,7 @@ function run_dispatch(string $read_dir, array $index): void {
             // ===== 一致せず → 新規 =====
             if (copy($file, DIR_REGISTERCACHE . '/' . basename($file))) {
                 unlink($file);
+                $index[$card_id] = $hash;  // メモリ内indexを即時更新（同バッチ内重複防止）
             }
 
         } elseif ($index[$card_id] === $hash) {

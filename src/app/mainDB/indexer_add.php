@@ -36,8 +36,11 @@ $index = file_exists(INDEX_JSON)
     ? json_decode(file_get_contents(INDEX_JSON), true) ?? []
     : [];
 
+// 増分をメモリ内で管理
+$additions = [];
+
 foreach ($files as $src_path) {
-    $filename = basename($src_path);
+    $filename  = basename($src_path);
     $dest_path = DIR_MAIN_DB . '/' . $filename;
 
     // JSONからcontent_hashを取得
@@ -54,14 +57,15 @@ foreach ($files as $src_path) {
         continue;
     }
 
-    // index.json に追記
-    $index[$filename] = $hash;
+    // メモリ内に増分を積む
+    $additions[$filename] = $hash;
     $success_count++;
 }
 
-// index.json を保存
+// 既存index + 増分をマージして1回だけ書き出す
+$merged_index = array_merge($index, $additions);
 file_put_contents(INDEX_JSON,
-    json_encode($index, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+    json_encode($merged_index, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
 );
 
 write_status($success_count, $fail_count, 'Done.');
