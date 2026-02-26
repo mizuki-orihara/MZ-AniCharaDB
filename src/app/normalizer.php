@@ -1,6 +1,6 @@
 <?php
 /**
- * normalizer.php
+ * normalizer.php  rev.2
  * 役割：01a_import_norm/内の ~temp_* フォルダからカードを読み出し、
  *       正規化・複製転記して 02_valid/Confirmed/ へ昇格させる
  *
@@ -11,6 +11,9 @@
  */
 
 require_once __DIR__ . '/API/config.php';
+
+error_log(TASK_MASTER_JSON);
+error_log(file_exists(TASK_MASTER_JSON) ? 'exists' : 'NOT FOUND');
 
 // ===== log・status記録用の初期化 =====
 
@@ -25,10 +28,26 @@ $errors        = [];
 
 $task_master = json_decode(file_get_contents(TASK_MASTER_JSON), true);
 
-if (($task_master['gates']['valid_verify'] ?? false) !== true) {
-    // ゲートが閉まっている → 何もせず正常終了
-    write_status_log('valid_verify:closed', $last_file, 0, 0, 0, []);
+// 1. 構造の妥当性チェック（キーが存在するか、期待する型か）
+if (!isset($task_master['gates']) || !is_array($task_master['gates']) || !array_key_exists('valid_verify', $task_master['gates'])) {
+    // 構造に問題がある（キーがない、または gates が配列でない等）
+    write_status_log('valid_verify:invalid_structure', $last_file, 0, 0, 0, []);
+    exit(1); // 異常終了とするか、ログを分けて処理
+}
+
+// 2. 値の評価
+$gate_status = $task_master['gates']['valid_verify'];
+
+if ($gate_status === true) {
+    // ゲートが開いている（処理続行）
+} elseif ($gate_status === false) {
+    // 明示的にゲートが閉じている
+    write_status_log('valid_verify:explicitly_closed', $last_file, 0, 0, 0, []);
     exit(0);
+} else {
+    // true/false 以外の無効な値（文字列など）が入っている場合
+    write_status_log('valid_verify:invalid_value_type', $last_file, 0, 0, 0, []);
+    exit(1);
 }
 
 // ===== ロック取得 =====
@@ -93,8 +112,9 @@ foreach ($temp_dirs as $temp_dir) {
         // --- 書き出しファイル名の生成 ---
         // [work]_[name]_[branch]_[hash].json
         // 値は原文保持、ファイル名生成時だけサニタイズ
-        $safe_work    = preg_replace('/[^\p{L}\p{N}_\-]/u', '_', $card['header']['work']   ?? 'unknown');
-        $safe_name    = preg_replace('/[^\p{L}\p{N}_\-]/u', '_', $card['header']['name']   ?? 'unknown');
+        // セクション内はハイフン区切り、セクション間は _ で連結
+        $safe_work    = preg_replace('/[^\p{L}\p{N}\-]/u', '-', preg_replace('/[\s\x{3000}]+/u', '-', trim($card['header']['work']   ?? 'unknown')));
+        $safe_name    = preg_replace('/[^\p{L}\p{N}\-]/u', '-', preg_replace('/[\s\x{3000}]+/u', '-', trim($card['header']['name']   ?? 'unknown')));
         $branch       = $card['header']['branch'] ?? 'main';
         $hash         = substr($card['header']['content_hash'], 0, 8);
         $new_filename = "{$safe_work}_{$safe_name}_{$branch}_{$hash}.json";
