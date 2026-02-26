@@ -23,7 +23,11 @@ header('Content-Type: application/json; charset=utf-8');
 $task_master = json_decode(file_get_contents(TASK_MASTER_JSON), true);
 if (($task_master['gates']['receiver'] ?? false) !== true) {
     http_response_code(503);
-    echo json_encode(['status' => 'error', 'message' => 'Receiver gate is closed.']);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Receiver gate is closed.',
+        'message_jp' => '受信ゲートが閉鎖されています。'
+         ],JSON_UNESCAPED_UNICODE);
     update_status('error', 'Gate closed.', null);
     exit;
 }
@@ -32,7 +36,11 @@ if (($task_master['gates']['receiver'] ?? false) !== true) {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'POST only.']);
+    echo json_encode([
+    'status' => 'error',
+    'message' => 'POST only.',
+    'message_jp' => 'POSTのみ対応しています。'
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -41,7 +49,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $sid = $_COOKIE['sid'] ?? '';
 if (empty($sid) || !preg_match('/^[a-f0-9]{6}-[a-f0-9]{6}$/', $sid)) {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'Invalid or missing SID.']);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Invalid or missing SID.',
+        'message_jp' => 'SIDが無効か、存在しません。'
+        ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -72,7 +84,11 @@ if (strlen($json_data) > IMPORT_MAX_SIZE) {
 $parsed = json_decode($json_data, true);
 if ($parsed === null) {
     http_response_code(400);
-    echo json_encode(['status' => 'error', 'message' => 'JSON parse failed.']);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'JSON parse failed.',
+        'message_jp' => 'JSONのパースに失敗しました。'
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -90,7 +106,7 @@ if (!is_dir($session_dir)) {
 
 // ===== セッション累積ファイル数チェック（ソフト上限） =====
 
-$existing_count = count(glob($session_dir . '/*.json') ?: []);
+$existing_count = count(glob($session_dir . '/'.'*.json') ?: []);
 $warn = $existing_count >= IMPORT_SOFT_LIMIT;
 
 // ===== ファイル名の決定 =====

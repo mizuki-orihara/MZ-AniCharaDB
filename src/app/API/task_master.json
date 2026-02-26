@@ -2,11 +2,11 @@
   "version": "0.1",
 
   "gates": {
-    "receive": true,
-    "varid_verify": true,
+    "receiver": true,
+    "valid_verify": true,
     "archive": true,
     "dispatch": true,
-    "marge_confirmd": true,
+    "merge_confirmd": true,
     "index_add": true,
     "index_rebuild": true,
     "build_statistics": true
