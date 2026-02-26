@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * normalizer.php
  * 役割：01a_import_norm/内の ~temp_* フォルダからカードを読み出し、

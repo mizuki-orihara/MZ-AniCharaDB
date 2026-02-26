@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * dispatcher.php
  * 役割: 02_valid/Confirmed/ および 03b_merge/M_Confirmed/ のカードを

@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 //ノーマライズによって転記の済んだ原本のアーカイブ処理
 // 01a_import_norm/~temp[SID]を、01c_import_raw_arc/へ、~[SID].zipにして保管
 
