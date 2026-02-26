@@ -8,7 +8,7 @@
  * エラーはexit(1)
  */
 
-require_once __DIR__ . '/../../API/config.php';
+require_once __DIR__ . '/../API/config.php';
 
 // ===== ゲートチェック =====
 
