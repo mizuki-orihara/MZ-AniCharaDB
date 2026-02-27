@@ -1,6 +1,7 @@
 <?php
 //ノーマライズによって転記の済んだ原本のアーカイブ処理
-// 01a_import_norm/~temp[SID]を、01c_import_raw_arc/へ、~[SID].zipにして保管
+// archive_queue.jsonに登録されてから12時間以上経過した ~temp_[SID] を
+// 01c_import_raw_arc/ へ ~[SID].zip にして保管し、キューから削除する
 
 require_once __DIR__ . '/API/config.php';
 
@@ -13,18 +14,18 @@ if (($task_master['gates']['archive'] ?? false) !== true) {
 
 // ▼ EXTEND: ゲート以外の起動条件（時間帯制限など）を追加するならここ
 
-//ノーマライザーが残した作業済みリスト（01a_import_norm/DONE.json）を読み込む
-$done_list_path = DIR_IMPORT_NORM . '/DONE.json';
-if (!file_exists($done_list_path)) {
-	// DONE.jsonがない → 何もせず正常終了
+// ノーマライザーが残した処理完了キュー（archive_queue.json）を読み込む
+$archive_queue_path = DIR_IMPORT_NORM . '/archive_queue.json';
+if (!file_exists($archive_queue_path)) {
+	// archive_queue.jsonがない → 何もせず正常終了
 	exit(0);
 }
 
-// DONE.jsonを読み込んで、追記されて24時間以上経過したディレクトリを圧縮
+// archive_queue.jsonを読み込んで、登録時刻から12時間以上経過したものを圧縮
 // log記録用タイマースタート
 $status_start_time = microtime(true);
 
-// ループ前（DONE.json読み込みの近く）で一度だけ開く
+// ループ前で一度だけ開く
 $archiver_log_path = __DIR__ . '/API/archiver_log.json';
 $archiver_log = file_exists($archiver_log_path)
     ? json_decode(file_get_contents($archiver_log_path), true) ?? []
@@ -39,13 +40,10 @@ if (!is_dir(DIR_IMPORT_RAW_ARC)) {
 	mkdir(DIR_IMPORT_RAW_ARC, 0755, true);
 }
 
-$done_list = json_decode(file_get_contents($done_list_path), true);
+$archive_queue = json_decode(file_get_contents($archive_queue_path), true);
 $now = time();
-foreach ($done_list as $sid => $timestamp) {
-	// 処理済み（配列化済み）のエントリはスキップ
-	if (!is_string($timestamp)) continue;
-
-	if ($now - strtotime($timestamp) >= 24 * 3600) {
+foreach ($archive_queue as $sid => $timestamp) {
+	if ($now - strtotime($timestamp) >= 12 * 3600) {
 		$temp_dir = DIR_IMPORT_NORM . '/~temp_' . $sid;
 		if (is_dir($temp_dir)) {
 			$zip_path = DIR_IMPORT_RAW_ARC . '/~' . $sid . '.zip';
@@ -63,7 +61,7 @@ foreach ($done_list as $sid => $timestamp) {
 
 				// zip成功時のみ削除・記録（失敗時は~tempをそのまま残す）
 				$file_count = count(glob($temp_dir . '/*.json'));
-				$done_list[$sid] = [$timestamp, $file_count]; // [タイムスタンプ, 枚数] に更新
+				unset($archive_queue[$sid]); // キューから削除
 
 				// ログエントリ追加　最新が上に来るよう追記して上書き
 				array_unshift($archiver_log, [
@@ -106,8 +104,8 @@ foreach ($done_list as $sid => $timestamp) {
 	}
 }
 
-// 更新されたDONEリストと、アーカイバーの作業ログを保存
-file_put_contents($done_list_path, json_encode($done_list, JSON_PRETTY_PRINT));
+// 更新されたキューと、アーカイバーの作業ログを保存
+file_put_contents($archive_queue_path, json_encode($archive_queue, JSON_PRETTY_PRINT));
 file_put_contents($archiver_log_path, json_encode($archiver_log, JSON_PRETTY_PRINT));
 
 // アーカイバー自身の作業記録（直近実行のスナップショット）

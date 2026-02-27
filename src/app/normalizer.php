@@ -81,6 +81,12 @@ foreach ([DIR_VALID_CONFIRMED, DIR_VALID_ERROR] as $dir) {
 
 $temp_dirs = glob(DIR_IMPORT_NORM . '/~temp_*', GLOB_ONLYDIR);
 
+// archive_queue.jsonを一度だけ読み込む（なければ空配列）
+$archive_queue_path = DIR_IMPORT_NORM . '/archive_queue.json';
+$archive_queue = file_exists($archive_queue_path)
+    ? json_decode(file_get_contents($archive_queue_path), true) ?? []
+    : [];
+
 foreach ($temp_dirs as $temp_dir) {
     $files = glob($temp_dir . '/*.json');
 
@@ -129,7 +135,18 @@ foreach ($temp_dirs as $temp_dir) {
 
         $success_count++;
     }
+
+    // --- このtempフォルダをarchive_queueに積む（成否問わず） ---
+    $sid = substr(basename($temp_dir), strlen('~temp_'));
+    $archive_queue[$sid] = date('Y-m-d H:i:s');
 }
+
+// ===== archive_queue.json 一括書き込み =====
+
+file_put_contents(
+    $archive_queue_path,
+    json_encode($archive_queue, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+);
 
 // ===== エラーリスト書き出し =====
 
