@@ -43,13 +43,16 @@ foreach ($files as $src_path) {
     $filename  = basename($src_path);
     $dest_path = DIR_MAIN_DB . '/' . $filename;
 
-    // JSONからcontent_hashを取得
+    // JSONからcard_idとcontent_hashを取得
     $card = json_decode(file_get_contents($src_path), true);
     if ($card === null) {
         $fail_count++;
         continue;
     }
-    $hash = $card['header']['content_hash'] ?? '';
+    $hash    = $card['header']['content_hash'] ?? '';
+    $card_id = ($card['header']['work']   ?? '')
+             . '_' . ($card['header']['name']   ?? '')
+             . '_' . ($card['header']['branch'] ?? '');
 
     // mainDB/ に移動
     if (!rename($src_path, $dest_path)) {
@@ -57,8 +60,8 @@ foreach ($files as $src_path) {
         continue;
     }
 
-    // メモリ内に増分を積む
-    $additions[$filename] = $hash;
+    // メモリ内に増分を積む（キーはcard_id）
+    $additions[$card_id] = $hash;
     $success_count++;
 }
 

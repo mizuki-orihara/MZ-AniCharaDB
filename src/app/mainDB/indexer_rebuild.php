@@ -46,9 +46,13 @@ foreach ($files as $file_path) {
         $fail_count++;
         continue;
     }
-    $hash = $card['header']['content_hash'] ?? '';
+    $hash    = $card['header']['content_hash'] ?? '';
+    $card_id = ($card['header']['work']   ?? '')
+             . '_' . ($card['header']['name']   ?? '')
+             . '_' . ($card['header']['branch'] ?? '');
 
-    $index[$filename] = $hash;
+    // 同card_idが既にある場合は上書き（最後に走査したものが残る）
+    $index[$card_id] = $hash;
     $success_count++;
 }
 
