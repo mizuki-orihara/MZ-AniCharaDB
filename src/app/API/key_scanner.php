@@ -5,7 +5,7 @@
 //   例: php key_scanner.php 500   → 最大500枚をスキャン
 //       php key_scanner.php       → 全数スキャン
 
-require_once __DIR__ . 'config.php';
+require_once __DIR__ . '/config.php';
 
 // 枚数上限（コマンドライン引数で指定、省略時は全数）
 $limit = isset($argv[1]) && is_numeric($argv[1]) ? (int)$argv[1] : PHP_INT_MAX;

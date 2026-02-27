@@ -1,14 +1,25 @@
-フォルダー パスの一覧
-ボリューム シリアル番号は B86A-75A2 です
-C:.
+フォルダー パスの一覧:  ボリューム ボリューム
+ボリューム シリアル番号は 8204-3CCB です
+D:.
+│  .gitignore
 │  folder_tree.txt
 │  README.md
 │  
 ├─Dev_Notes
+│      MZ-AniCharaDB_ほぼ固まりつつある仕様.md
+│      MZ-AniCharaDB_要再検討な仕様.md
 │      階層構造メモ.txt
 │      
 └─src
     ├─app
+    │  │  archiver.php
+    │  │  dispatcher.php
+    │  │  import_bulk.php
+    │  │  import_Norm.php
+    │  │  import_Norm_status.json
+    │  │  merge_scanner.php
+    │  │  normalizer.php
+    │  │  
     │  ├─01a_import_norm
     │  │  │  .gitkeep
     │  │  │  
@@ -28,18 +39,29 @@ C:.
     │  │      .gitkeep
     │  │      
     │  ├─03b_merge
-    │  │      .gitkeep
-    │  │      
+    │  │  │  .gitkeep
+    │  │  │  MergeList.json
+    │  │  │  
+    │  │  └─M_Confirmed
     │  ├─API
     │  │      config.php
+    │  │      key_scanner.php
+    │  │      server_config.json
     │  │      task_master.json
+    │  │      uid.php
     │  │      
     │  ├─console
+    │  │      card_form.html
     │  │      menu.html
+    │  │      uploader.html
     │  │      
     │  ├─mainDB
-    │  │      .gitkeep
-    │  │      
+    │  │  │  .gitkeep
+    │  │  │  indexer_add.php
+    │  │  │  indexer_rebuild.php
+    │  │  │  
+    │  │  └─registercache
+    │  ├─mainDB_OLD
     │  └─viewer
     │          .gitkeep
     │          
