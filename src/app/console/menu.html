@@ -1,22 +1,116 @@
-﻿<html>
-
-
+﻿<!doctype html>
+<html lang="ja">
 <head>
 <meta charset="utf-8">
-
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理メニュー</title>
+<style>
+body { font-family: sans-serif; margin: 20px; background: #f6f7fb; }
+h1 { margin-bottom: 8px; }
+.card { background: #fff; border: 1px solid #e3e5ee; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+.summary { display: flex; gap: 12px; flex-wrap: wrap; }
+.badge { border-radius: 999px; padding: 4px 10px; font-size: 12px; background: #eef2ff; }
+.badge.ok { background: #e8f7eb; }
+.badge.warn { background: #fff8d8; }
+.badge.err { background: #ffe5e5; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: #fff; }
+th, td { border-bottom: 1px solid #eceef5; padding: 8px; text-align: left; vertical-align: top; font-size: 13px; }
+.status-ok { color: #0f7b2d; font-weight: 700; }
+.status-warning { color: #9a6700; font-weight: 700; }
+.status-error, .status-fail, .status-failed { color: #b42318; font-weight: 700; }
+small { color: #667085; }
+button { padding: 6px 10px; }
+</style>
 </head>
 <body>
+    <h1>管理メニュー</h1>
+    <p><small>各モジュールの <code>*_status.json</code> を収集して表示します。</small></p>
 
-    <div>
-
+    <div class="card">
+        <button id="reloadBtn">再読込</button>
+        <small id="generatedAt"></small>
+        <div class="summary" id="summary"></div>
     </div>
 
+    <div class="card table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>モジュール</th>
+                    <th>状態</th>
+                    <th>メッセージ</th>
+                    <th>更新日時</th>
+                    <th>ステータスファイル</th>
+                </tr>
+            </thead>
+            <tbody id="statusRows">
+                <tr><td colspan="5">読み込み中...</td></tr>
+            </tbody>
+        </table>
+    </div>
 
     <script>
+    const rows = document.getElementById('statusRows');
+    const summary = document.getElementById('summary');
+    const generatedAt = document.getElementById('generatedAt');
 
+    function esc(text) {
+        return String(text ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+    }
 
+    function statusClass(status) {
+        const s = String(status || '').toLowerCase();
+        if (s === 'success') return 'status-ok';
+        return `status-${s}`;
+    }
+
+    function renderSummary(data) {
+        const s = data.summary || {};
+        summary.innerHTML = `
+            <span class="badge">total: ${s.total ?? 0}</span>
+            <span class="badge ok">ok: ${s.ok ?? 0}</span>
+            <span class="badge warn">warning: ${s.warning ?? 0}</span>
+            <span class="badge err">error: ${s.error ?? 0}</span>
+            <span class="badge">other: ${s.other ?? 0}</span>
+        `;
+    }
+
+    function renderRows(modules) {
+        if (!Array.isArray(modules) || modules.length === 0) {
+            rows.innerHTML = '<tr><td colspan="5">statusファイルが見つかりません。</td></tr>';
+            return;
+        }
+
+        rows.innerHTML = modules.map(item => `
+            <tr>
+                <td>${esc(item.module)}</td>
+                <td class="${statusClass(item.status)}">${esc(item.status)}</td>
+                <td>${esc(item.message)}</td>
+                <td>${esc(item.updated_at)}</td>
+                <td><code>${esc(item.path)}</code></td>
+            </tr>
+        `).join('');
+    }
+
+    async function loadStatuses() {
+        rows.innerHTML = '<tr><td colspan="5">読み込み中...</td></tr>';
+        try {
+            const res = await fetch('../API/status_overview.php', { cache: 'no-store' });
+            const data = await res.json();
+            if (!res.ok || data.status !== 'ok') {
+                throw new Error(data.message || `HTTP ${res.status}`);
+            }
+            generatedAt.textContent = `生成時刻: ${data.generated_at || '-'}`;
+            renderSummary(data);
+            renderRows(data.modules || []);
+        } catch (err) {
+            rows.innerHTML = `<tr><td colspan="5">読み込み失敗: ${esc(err.message)}</td></tr>`;
+        }
+    }
+
+    document.getElementById('reloadBtn').addEventListener('click', loadStatuses);
+    loadStatuses();
     </script>
 </body>
-
 </html>
