@@ -8,8 +8,8 @@
 
 
 ###
-運用サンプル　(カード作成フォーム)
-http://mizukihouse.mydns.jp/svr0/animdb/src/app/console/card_form.html
+カード作成フォーム
+/src/app/console/card_form.html
 
 
 ------------------------------------------------------------------------
