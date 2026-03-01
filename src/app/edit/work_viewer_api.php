@@ -43,6 +43,7 @@ foreach ($files as $file_path) {
     $card_id = $card['header']['work'] . '_' . $card['header']['name'] . '_' . $card['header']['branch'];
     if (empty($work)) continue;
 
+    $card['_filename'] = basename($file_path);
     $work_map[$work][$card_id] = $card;
 }
 
@@ -99,10 +100,13 @@ if ($mode === 'matrix') {
     sort($other_keys);
     $ordered_keys = array_values(array_merge($header_keys, $other_keys));
 
-    // キャラ名リスト（表示用）
+    // キャラ名リスト（表示用）+ filename
     $charas = [];
     foreach ($cards as $card_id => $card) {
-        $charas[$card_id] = $card['header']['name'] ?? $card_id;
+        $charas[$card_id] = [
+            'name'     => $card['header']['name'] ?? $card_id,
+            'filename' => $card['_filename'] ?? '',
+        ];
     }
 
     echo json_encode([

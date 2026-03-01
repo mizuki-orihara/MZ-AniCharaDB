@@ -45,7 +45,7 @@ mkdir(DIR_DISCARD_TEMP, 0775, true);
 
 // ===== 書き出し先ディレクトリの準備（なければ作る） =====
 foreach ([DIR_REGISTERCACHE, DIR_MERGE] as $dir) {
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
 }
 
 // ===== index.json を一度だけ読み込む =====
@@ -58,9 +58,27 @@ $discard_count = 0;
 $merge_count   = 0;
 
 // ===== dispatcher_log.csv の準備 =====
-// バッチ実行ごとに区切り行＋ヘッダーを追記する
+// 1000件超えていたらタイムスタンプ付きにリネームして新規作成
 $log_path = __DIR__ . '/dispatcher_log.csv';
-$log_fh   = fopen($log_path, 'a');
+
+if (file_exists($log_path)) {
+    // データ行数カウント（#区切り行とヘッダー行を除く）
+    $line_count = 0;
+    $fh = fopen($log_path, 'r');
+    while (($line = fgets($fh)) !== false) {
+        $trimmed = trim($line);
+        if ($trimmed === '' || str_starts_with($trimmed, '#') || str_starts_with($trimmed, 'timestamp')) continue;
+        $line_count++;
+    }
+    fclose($fh);
+
+    if ($line_count > 1000) {
+        $archive_path = __DIR__ . '/dispatcher_log_' . date('Ymd_His') . '.csv';
+        rename($log_path, $archive_path);
+    }
+}
+
+$log_fh = fopen($log_path, 'a');
 fwrite($log_fh, '# ' . date('Y-m-d H:i:s') . "\n");
 fputcsv($log_fh, ['timestamp', 'filename', 'card_id', 'result']);
 

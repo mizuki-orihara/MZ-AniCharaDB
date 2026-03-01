@@ -460,302 +460,363 @@
     <div id="toast"></div>
 
     <script>
-const API_URL        = './card_editor_api.php';
-const SEARCH_IDX_URL = '../API/search_index.json';
+        const API_URL = './card_editor_api.php';
+        const SEARCH_IDX_URL = '../API/search_index.json';
 
-// コア項目
-const CORE_KEYS = new Set(['schema', 'uuid', 'content_hash', 'generated_at', 'branch', 'work', 'name']);
+        // コア項目
+        const CORE_KEYS = new Set(['schema', 'uuid', 'content_hash', 'generated_at', 'branch', 'work', 'name']);
 
-// ===== 状態 =====
-let searchIndex   = [];  // [{filename, card_id, work, name, branch}, ...]
-let currentCardId = null;
-let currentCard   = null;
-let currentFile   = null;
-let unlockedKeys  = new Set();
-let editedValues  = {};  // key_path => new value
+        // ===== 状態 =====
+        let searchIndex = [];  // [{filename, card_id, work, name, branch}, ...]
+        let currentCardId = null;
+        let currentCard = null;
+        let currentFile = null;
+        let unlockedKeys = new Set();
+        let editedValues = {};  // key_path => new value
 
-// ===== 初期化 =====
-window.addEventListener('DOMContentLoaded', async () => {
-  await loadSearchIndex();
-  document.getElementById('search-input').addEventListener('input', onSearch);
-  document.getElementById('btn-save').addEventListener('click', onSave);
-});
+        // ===== 初期化 =====
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadSearchIndex();
+            document.getElementById('search-input').addEventListener('input', onSearch);
+            document.getElementById('btn-save').addEventListener('click', onSave);
 
-// ===== search_index.json 読み込み =====
-async function loadSearchIndex() {
-  try {
-    const res   = await fetch(SEARCH_IDX_URL);
-    searchIndex = await res.json();
-    document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
-  } catch(e) {
-    document.getElementById('search-hint').textContent = 'search_index.json 読み込み失敗';
-  }
-}
+            // URLパラメータにfilenameがあれば自動ロード
+            const params = new URLSearchParams(window.location.search);
+            const filename = params.get('filename');
+            if (filename) {
+                // search_indexからcard_idを特定
+                const entry = searchIndex.find(e => e.filename === filename);
+                if (entry) {
+                    // 検索欄にwork名を入れて候補を表示した状態にする
+                    document.getElementById('search-input').value = entry.work;
+                    onSearch();
+                    // 該当候補を自動選択
+                    const items = document.querySelectorAll('.candidate-item');
+                    for (const item of items) {
+                        if (item.querySelector('.c-name')?.textContent === entry.name) {
+                            item.click();
+                            break;
+                        }
+                    }
+                } else {
+                    // search_indexになくてもfilenameで直接ロード
+                    const cardId = filename.replace(/_[0-9a-f]{8}\.json$/, '');
+                    await selectCardByFilename(cardId, filename);
+                }
+            }
+        });
 
-// ===== 検索 =====
-function onSearch() {
-  const q    = document.getElementById('search-input').value.trim().toLowerCase();
-  const list = document.getElementById('candidate-list');
-  list.innerHTML = '';
+        // ===== search_index.json 読み込み =====
+        async function loadSearchIndex() {
+            try {
+                const res = await fetch(SEARCH_IDX_URL);
+                searchIndex = await res.json();
+                document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
+            } catch (e) {
+                document.getElementById('search-hint').textContent = 'search_index.json 読み込み失敗';
+            }
+        }
 
-  if (q.length < 1) {
-    document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
-    return;
-  }
+        // ===== ファイル名直接指定でのロード（URLパラメータ用）=====
+        async function selectCardByFilename(cardId, filename) {
+            currentCardId = cardId;
+            currentFile = filename;
+            unlockedKeys = new Set();
+            editedValues = {};
 
-  const matched = searchIndex.filter(e =>
-    e.card_id.toLowerCase().includes(q) ||
-    e.work.toLowerCase().includes(q) ||
-    e.name.toLowerCase().includes(q)
-  );
-  document.getElementById('search-hint').textContent = `${matched.length}件一致`;
+            document.getElementById('current-card-id').textContent = cardId;
+            document.getElementById('btn-save').disabled = true;
+            document.getElementById('table-wrap').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('loading-state').style.display = 'flex';
 
-  matched.slice(0, 50).forEach(entry => {
-    const el = document.createElement('div');
-    el.className = 'candidate-item';
-    el.innerHTML = `
-      <div class="c-work">${escHtml(entry.work)}</div>
-      <div class="c-name">${escHtml(entry.name)}</div>
-      <div class="c-branch">${escHtml(entry.branch)}</div>
-    `;
-    el.addEventListener('click', () => selectCard(entry.card_id, entry.filename, el));
-    list.appendChild(el);
-  });
-}
+            try {
+                const res = await fetch(`${API_URL}?mode=load&filename=${encodeURIComponent(filename)}`);
+                const data = await res.json();
 
-// ===== カード選択・読み込み =====
-async function selectCard(cardId, filename, el) {
-  document.querySelectorAll('.candidate-item').forEach(e => e.classList.remove('active'));
-  el.classList.add('active');
+                if (data.status !== 'ok') {
+                    showToast('読み込みエラー: ' + (data.message ?? '不明'), 'err');
+                    document.getElementById('loading-state').style.display = 'none';
+                    document.getElementById('empty-state').style.display = 'flex';
+                    return;
+                }
 
-  currentCardId = cardId;
-  currentFile   = filename;
-  unlockedKeys  = new Set();
-  editedValues  = {};
+                currentCard = data.card;
+                renderTable();
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('table-wrap').style.display = 'block';
+                document.getElementById('btn-save').disabled = false;
+            } catch (e) {
+                showToast('通信エラー', 'err');
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'flex';
+            }
+        }
 
-  document.getElementById('current-card-id').textContent = cardId;
-  document.getElementById('btn-save').disabled = true;
-  document.getElementById('table-wrap').style.display    = 'none';
-  document.getElementById('empty-state').style.display   = 'none';
-  document.getElementById('loading-state').style.display = 'flex';
+        // ===== 検索 =====
+        function onSearch() {
+            const q = document.getElementById('search-input').value.trim().toLowerCase();
+            const list = document.getElementById('candidate-list');
+            list.innerHTML = '';
 
-  try {
-    const res  = await fetch(`${API_URL}?mode=load&filename=${encodeURIComponent(filename)}`);
-    const data = await res.json();
+            if (q.length < 1) {
+                document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
+                return;
+            }
 
-    if (data.status !== 'ok') {
-      showToast('読み込みエラー: ' + (data.message ?? '不明'), 'err');
-      document.getElementById('loading-state').style.display = 'none';
-      document.getElementById('empty-state').style.display   = 'flex';
-      return;
-    }
+            const matched = searchIndex.filter(e =>
+                e.card_id.toLowerCase().includes(q) ||
+                e.work.toLowerCase().includes(q) ||
+                e.name.toLowerCase().includes(q)
+            );
+            document.getElementById('search-hint').textContent = `${matched.length}件一致`;
 
-    currentCard = data.card;
+            matched.slice(0, 50).forEach(entry => {
+                const el = document.createElement('div');
+                el.className = 'candidate-item';
+                el.innerHTML = `
+          <div class="c-work">${escHtml(entry.work)}</div>
+          <div class="c-name">${escHtml(entry.name)}</div>
+          <div class="c-branch">${escHtml(entry.branch)}</div>
+        `;
+                el.addEventListener('click', () => selectCard(entry.card_id, entry.filename, el));
+                list.appendChild(el);
+            });
+        }
 
-    renderTable();
-    document.getElementById('loading-state').style.display = 'none';
-    document.getElementById('table-wrap').style.display    = 'block';
-    document.getElementById('btn-save').disabled = false;
+        // ===== カード選択・読み込み =====
+        async function selectCard(cardId, filename, el) {
+            document.querySelectorAll('.candidate-item').forEach(e => e.classList.remove('active'));
+            el.classList.add('active');
 
-  } catch(e) {
-    showToast('通信エラー', 'err');
-    document.getElementById('loading-state').style.display = 'none';
-    document.getElementById('empty-state').style.display   = 'flex';
-  }
-}
+            currentCardId = cardId;
+            currentFile = filename;
+            unlockedKeys = new Set();
+            editedValues = {};
 
-// ===== テーブル描画 =====
-function renderTable() {
-  const tbody = document.getElementById('edit-tbody');
-  tbody.innerHTML = '';
+            document.getElementById('current-card-id').textContent = cardId;
+            document.getElementById('btn-save').disabled = true;
+            document.getElementById('table-wrap').style.display = 'none';
+            document.getElementById('empty-state').style.display = 'none';
+            document.getElementById('loading-state').style.display = 'flex';
 
-  const flat = flattenCard(currentCard);
+            try {
+                const res = await fetch(`${API_URL}?mode=load&filename=${encodeURIComponent(filename)}`);
+                const data = await res.json();
 
-  // header系を先頭に
-  const headerKeys = Object.keys(flat).filter(k => k.startsWith('header.'));
-  const otherKeys  = Object.keys(flat).filter(k => !k.startsWith('header.')).sort();
-  const orderedKeys = [...headerKeys, ...otherKeys];
+                if (data.status !== 'ok') {
+                    showToast('読み込みエラー: ' + (data.message ?? '不明'), 'err');
+                    document.getElementById('loading-state').style.display = 'none';
+                    document.getElementById('empty-state').style.display = 'flex';
+                    return;
+                }
 
-  orderedKeys.forEach(keyPath => {
-    const topKey = keyPath.startsWith('header.')
-      ? keyPath.split('.')[1]
-      : keyPath.split('.')[0];
-    const isCore     = CORE_KEYS.has(topKey);
-    const isUnlocked = unlockedKeys.has(keyPath);
-    const val        = flat[keyPath];
-    const isObj      = val !== null && typeof val === 'object';
+                currentCard = data.card;
 
-    const tr = document.createElement('tr');
-    tr.classList.toggle('is-locked',   isCore && !isUnlocked);
-    tr.classList.toggle('is-unlocked', isCore && isUnlocked);
-    tr.dataset.key = keyPath;
+                renderTable();
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('table-wrap').style.display = 'block';
+                document.getElementById('btn-save').disabled = false;
 
-    // キー列
-    const tdKey = document.createElement('td');
-    tdKey.className = 'key-cell' + (isCore ? ' core' : '');
-    tdKey.textContent = keyPath;
+            } catch (e) {
+                showToast('通信エラー', 'err');
+                document.getElementById('loading-state').style.display = 'none';
+                document.getElementById('empty-state').style.display = 'flex';
+            }
+        }
 
-    // 値列
-    const tdVal = document.createElement('td');
-    tdVal.className = 'val-cell';
+        // ===== テーブル描画 =====
+        function renderTable() {
+            const tbody = document.getElementById('edit-tbody');
+            tbody.innerHTML = '';
 
-    if (isObj) {
-      // オブジェクト・配列は表示のみ
-      const pre = document.createElement('pre');
-      pre.textContent = JSON.stringify(val, null, 2);
-      tdVal.appendChild(pre);
-    } else if (isCore && !isUnlocked) {
-      // ロックされたコア項目
-      const span = document.createElement('span');
-      span.className = 'locked-val';
-      span.textContent = val ?? '?';
-      tdVal.appendChild(span);
-    } else {
-      // 編集可能
-      const currentVal = editedValues[keyPath] !== undefined ? editedValues[keyPath] : (val ?? '');
-      const input = document.createElement('textarea');
-      input.className = 'editable' + (editedValues[keyPath] !== undefined ? ' modified' : '');
-      input.rows = 1;
-      input.value = currentVal;
-      input.dataset.key = keyPath;
-      input.dataset.original = String(val ?? '');
-      input.addEventListener('input', onEdit);
-      tdVal.appendChild(input);
-    }
+            const flat = flattenCard(currentCard);
 
-    // ロック列
-    const tdLock = document.createElement('td');
-    tdLock.className = 'lock-cell';
+            // header系を先頭に
+            const headerKeys = Object.keys(flat).filter(k => k.startsWith('header.'));
+            const otherKeys = Object.keys(flat).filter(k => !k.startsWith('header.')).sort();
+            const orderedKeys = [...headerKeys, ...otherKeys];
 
-    if (isObj) {
-      const span = document.createElement('span');
-      span.className = 'lock-badge';
-      span.textContent = '{…}';
-      tdLock.appendChild(span);
-    } else if (isCore) {
-      const btn = document.createElement('button');
-      btn.className = 'btn-unlock' + (isUnlocked ? ' unlocked' : '');
-      btn.textContent = isUnlocked ? '  解除中' : '  解除';
-      btn.dataset.key = keyPath;
-      btn.addEventListener('click', () => toggleUnlock(keyPath));
-      tdLock.appendChild(btn);
-    }
+            orderedKeys.forEach(keyPath => {
+                const topKey = keyPath.startsWith('header.')
+                    ? keyPath.split('.')[1]
+                    : keyPath.split('.')[0];
+                const isCore = CORE_KEYS.has(topKey);
+                const isUnlocked = unlockedKeys.has(keyPath);
+                const val = flat[keyPath];
+                const isObj = val !== null && typeof val === 'object';
 
-    tr.appendChild(tdKey);
-    tr.appendChild(tdVal);
-    tr.appendChild(tdLock);
-    tbody.appendChild(tr);
-  });
-}
+                const tr = document.createElement('tr');
+                tr.classList.toggle('is-locked', isCore && !isUnlocked);
+                tr.classList.toggle('is-unlocked', isCore && isUnlocked);
+                tr.dataset.key = keyPath;
 
-// ===== 編集検知 =====
-function onEdit(e) {
-  const key      = e.target.dataset.key;
-  const original = e.target.dataset.original;
-  const current  = e.target.value;
+                // キー列
+                const tdKey = document.createElement('td');
+                tdKey.className = 'key-cell' + (isCore ? ' core' : '');
+                tdKey.textContent = keyPath;
 
-  if (current !== original) {
-    editedValues[key] = current;
-    e.target.classList.add('modified');
-  } else {
-    delete editedValues[key];
-    e.target.classList.remove('modified');
-  }
-}
+                // 値列
+                const tdVal = document.createElement('td');
+                tdVal.className = 'val-cell';
 
-// ===== コアロック解除 =====
-function toggleUnlock(keyPath) {
-  if (unlockedKeys.has(keyPath)) {
-    unlockedKeys.delete(keyPath);
-    // 編集値もリセット
-    delete editedValues[keyPath];
-  } else {
-    unlockedKeys.add(keyPath);
-  }
-  renderTable();
-}
+                if (isObj) {
+                    // オブジェクト・配列は表示のみ
+                    const pre = document.createElement('pre');
+                    pre.textContent = JSON.stringify(val, null, 2);
+                    tdVal.appendChild(pre);
+                } else if (isCore && !isUnlocked) {
+                    // ロックされたコア項目
+                    const span = document.createElement('span');
+                    span.className = 'locked-val';
+                    span.textContent = val ?? '?';
+                    tdVal.appendChild(span);
+                } else {
+                    // 編集可能
+                    const currentVal = editedValues[keyPath] !== undefined ? editedValues[keyPath] : (val ?? '');
+                    const input = document.createElement('textarea');
+                    input.className = 'editable' + (editedValues[keyPath] !== undefined ? ' modified' : '');
+                    input.rows = 1;
+                    input.value = currentVal;
+                    input.dataset.key = keyPath;
+                    input.dataset.original = String(val ?? '');
+                    input.addEventListener('input', onEdit);
+                    tdVal.appendChild(input);
+                }
 
-// ===== 保存 =====
-async function onSave() {
-  if (!currentCard || !currentFile) return;
+                // ロック列
+                const tdLock = document.createElement('td');
+                tdLock.className = 'lock-cell';
 
-  if (Object.keys(editedValues).length === 0) {
-    showToast('変更がありません', 'warn');
-    return;
-  }
+                if (isObj) {
+                    const span = document.createElement('span');
+                    span.className = 'lock-badge';
+                    span.textContent = '{…}';
+                    tdLock.appendChild(span);
+                } else if (isCore) {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-unlock' + (isUnlocked ? ' unlocked' : '');
+                    btn.textContent = isUnlocked ? '  解除中' : '  解除';
+                    btn.dataset.key = keyPath;
+                    btn.addEventListener('click', () => toggleUnlock(keyPath));
+                    tdLock.appendChild(btn);
+                }
 
-  const payload = {
-    card_id:  currentCardId,
-    filename: currentFile,
-    edits:    editedValues,
-  };
+                tr.appendChild(tdKey);
+                tr.appendChild(tdVal);
+                tr.appendChild(tdLock);
+                tbody.appendChild(tr);
+            });
+        }
 
-  try {
-    const res  = await fetch(API_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-    });
-    const data = await res.json();
+        // ===== 編集検知 =====
+        function onEdit(e) {
+            const key = e.target.dataset.key;
+            const original = e.target.dataset.original;
+            const current = e.target.value;
 
-    if (data.status === 'ok') {
-      showToast('保存しました: ' + (data.new_file ?? ''), 'ok');
-      // 保存後はリセット
-      currentCard   = null;
-      currentFile   = null;
-      currentCardId = null;
-      editedValues  = {};
-      unlockedKeys  = new Set();
-      document.getElementById('table-wrap').style.display  = 'none';
-      document.getElementById('empty-state').style.display = 'flex';
-      document.getElementById('current-card-id').textContent = '?';
-      document.getElementById('btn-save').disabled = true;
-      // search_indexを再読み込み
-      await loadSearchIndex();
-      document.getElementById('search-input').value = '';
-      document.getElementById('candidate-list').innerHTML = '';
-      document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
-    } else {
-      showToast('エラー: ' + (data.message ?? '不明'), 'err');
-    }
-  } catch(e) {
-    showToast('送信に失敗しました', 'err');
-  }
-}
+            if (current !== original) {
+                editedValues[key] = current;
+                e.target.classList.add('modified');
+            } else {
+                delete editedValues[key];
+                e.target.classList.remove('modified');
+            }
+        }
 
-// ===== ユーティリティ =====
-function flattenCard(card) {
-  const result = {};
-  for (const [key, val] of Object.entries(card ?? {})) {
-    if (key === 'header') {
-      for (const [hk, hv] of Object.entries(val ?? {})) {
-        result[`header.${hk}`] = hv;
-      }
-    } else if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
-      for (const [sk, sv] of Object.entries(val)) {
-        result[`${key}.${sk}`] = sv;
-      }
-    } else {
-      result[key] = val;
-    }
-  }
-  return result;
-}
+        // ===== コアロック解除 =====
+        function toggleUnlock(keyPath) {
+            if (unlockedKeys.has(keyPath)) {
+                unlockedKeys.delete(keyPath);
+                // 編集値もリセット
+                delete editedValues[keyPath];
+            } else {
+                unlockedKeys.add(keyPath);
+            }
+            renderTable();
+        }
 
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+        // ===== 保存 =====
+        async function onSave() {
+            if (!currentCard || !currentFile) return;
 
-function showToast(msg, type = 'ok') {
-  const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = `show ${type}`;
-  setTimeout(() => { el.className = ''; }, 3500);
-}
+            if (Object.keys(editedValues).length === 0) {
+                showToast('変更がありません', 'warn');
+                return;
+            }
+
+            const payload = {
+                card_id: currentCardId,
+                filename: currentFile,
+                edits: editedValues,
+            };
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+
+                if (data.status === 'ok') {
+                    showToast('保存しました: ' + (data.new_file ?? ''), 'ok');
+                    // 保存後はリセット
+                    currentCard = null;
+                    currentFile = null;
+                    currentCardId = null;
+                    editedValues = {};
+                    unlockedKeys = new Set();
+                    document.getElementById('table-wrap').style.display = 'none';
+                    document.getElementById('empty-state').style.display = 'flex';
+                    document.getElementById('current-card-id').textContent = '?';
+                    document.getElementById('btn-save').disabled = true;
+                    // search_indexを再読み込み
+                    await loadSearchIndex();
+                    document.getElementById('search-input').value = '';
+                    document.getElementById('candidate-list').innerHTML = '';
+                    document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
+                } else {
+                    showToast('エラー: ' + (data.message ?? '不明'), 'err');
+                }
+            } catch (e) {
+                showToast('送信に失敗しました', 'err');
+            }
+        }
+
+        // ===== ユーティリティ =====
+        function flattenCard(card) {
+            const result = {};
+            for (const [key, val] of Object.entries(card ?? {})) {
+                if (key === 'header') {
+                    for (const [hk, hv] of Object.entries(val ?? {})) {
+                        result[`header.${hk}`] = hv;
+                    }
+                } else if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+                    for (const [sk, sv] of Object.entries(val)) {
+                        result[`${key}.${sk}`] = sv;
+                    }
+                } else {
+                    result[key] = val;
+                }
+            }
+            return result;
+        }
+
+        function escHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function showToast(msg, type = 'ok') {
+            const el = document.getElementById('toast');
+            el.textContent = msg;
+            el.className = `show ${type}`;
+            setTimeout(() => { el.className = ''; }, 3500);
+        }
     </script>
 </body>
 </html>
