@@ -37,7 +37,7 @@ $error_count    = 0;
 
 // 書き出し先ディレクトリの存在確認（なければ作成）
 if (!is_dir(DIR_IMPORT_RAW_ARC)) {
-	mkdir(DIR_IMPORT_RAW_ARC, 0755, true);
+	mkdir(DIR_IMPORT_RAW_ARC, 0775, true);
 }
 
 $archive_queue = json_decode(file_get_contents($archive_queue_path), true);

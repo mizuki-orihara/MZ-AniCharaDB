@@ -41,7 +41,7 @@ if (is_dir(DIR_DISCARD_TEMP)) {
     }
     rmdir(DIR_DISCARD_TEMP);
 }
-mkdir(DIR_DISCARD_TEMP, 0755, true);
+mkdir(DIR_DISCARD_TEMP, 0775, true);
 
 // ===== 書き出し先ディレクトリの準備（なければ作る） =====
 foreach ([DIR_REGISTERCACHE, DIR_MERGE] as $dir) {

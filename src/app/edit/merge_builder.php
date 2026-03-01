@@ -105,7 +105,7 @@ $new_filename = "{$safe_work}_{$safe_name}_{$branch}_{$hash}.json";
 // ===== 書き出し先ディレクトリの準備 =====
 
 foreach ([DIR_MERGE_CONF, DIR_MAIN_DB_OLD] as $dir) {
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
 }
 
 // ===== 1. 新カード → M_Confirmed/ =====

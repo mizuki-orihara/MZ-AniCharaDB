@@ -7,6 +7,7 @@
  * 読み出し元：01a_import_norm/~temp_* / *.json
  * 書き出し先（正常）：02_valid/Confirmed/  [work]_[name]_[branch]_[hash].json
  * 書き出し先（エラー）：02_valid/error/  [raw_filename].json
+ * 書き出し先（アーカイブキュー）　：01a_import_norm/archive_queue.json  {sid: timestamp, ...}
  * エラーリスト：02_valid/error/errors.json  ["エラー理由 / ファイル名", ...] 発生順
  */
 
@@ -74,7 +75,7 @@ file_put_contents($lock_path, json_encode([
 // ===== 書き出し先ディレクトリの準備 =====
 
 foreach ([DIR_VALID_CONFIRMED, DIR_VALID_ERROR] as $dir) {
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
+    if (!is_dir($dir)) mkdir($dir, 0775, true);
 }
 
 // ===== メインループ =====

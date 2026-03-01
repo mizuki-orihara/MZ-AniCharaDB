@@ -96,7 +96,7 @@ if ($parsed === null) {
 
 $session_dir = DIR_IMPORT_NORM . '/~temp_' . $sid;
 if (!is_dir($session_dir)) {
-    if (!mkdir($session_dir, 0755, true)) {
+    if (!mkdir($session_dir, 0775, true)) {
         http_response_code(500);
         echo json_encode(['status' => 'error', 'message' => 'Failed to create session directory.']);
         update_status('error', 'mkdir failed: ~temp_' . $sid, $sid);
