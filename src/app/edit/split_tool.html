@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MZ-AniCharaDB | Bulk Splitter</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Noto+Sans+JP:wght@300;400;500&family=Playfair+Display:ital,wght@1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:           #0f0f0d;
+    --surface:      #1a1916;
+    --surface2:     #222220;
+    --border:       #2e2c28;
+    --border-light: #3e3c38;
+    --text:         #e8e4dc;
+    --text-mid:     #9a9690;
+    --text-soft:    #5a5750;
+    --accent:       #c8a96e;
+    --accent-dim:   #8a7048;
+    --accent-glow:  rgba(200,169,110,0.12);
+    --ok:           #4a9e6e;
+    --ok-dim:       rgba(74,158,110,0.15);
+    --err:          #c0392b;
+    --err-dim:      rgba(192,57,43,0.15);
+    --mono:         'DM Mono', monospace;
+    --sans:         'Noto Sans JP', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+
+  /* ── ノイズテクスチャ overlay ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── ヘッダー ── */
+  header {
+    position: relative;
+    z-index: 10;
+    border-bottom: 1px solid var(--border);
+    padding: 18px 36px;
+    display: flex;
+    align-items: baseline;
+    gap: 20px;
+    background: var(--surface);
+  }
+  .logo {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-soft);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  header h1 {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: 0.06em;
+  }
+  .header-badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-soft);
+    border: 1px solid var(--border-light);
+    padding: 3px 10px;
+    border-radius: 2px;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── メイン ── */
+  main {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 0;
+    min-height: 0;
+  }
+
+  /* ── 左パネル ── */
+  .panel-left {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    background: var(--surface);
+    overflow-y: auto;
+  }
+
+  .panel-section {
+    padding: 24px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-section:last-child { border-bottom: none; }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-soft);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ドロップゾーン */
+  .dropzone {
+    border: 1px dashed var(--border-light);
+    border-radius: 4px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+  }
+  .dropzone:hover, .dropzone.drag-over {
+    border-color: var(--accent-dim);
+    background: var(--accent-glow);
+  }
+  .dropzone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+  .dropzone-icon {
+    font-size: 28px;
+    margin-bottom: 10px;
+    opacity: 0.5;
+  }
+  .dropzone-text {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.8;
+  }
+  .dropzone-sub {
+    font-size: 10px;
+    color: var(--text-soft);
+    margin-top: 6px;
+  }
+
+  /* ファイルリスト */
+  .file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .file-item {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 8px 12px;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .file-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-soft);
+    white-space: nowrap;
+  }
+  .file-remove {
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    transition: color 0.15s;
+  }
+  .file-remove:hover { color: var(--err); }
+
+  /* 設定フィールド */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin-bottom: 16px;
+  }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mid);
+    letter-spacing: 0.04em;
+  }
+  .field input[type="text"],
+  .field select {
+    background: var(--surface2);
+    border: 1px solid var(--border-light);
+    border-radius: 3px;
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent-dim);
+  }
+  .field select option { background: var(--surface2); }
+
+  /* チェックボックスフィールド */
+  .check-field {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .check-field input[type="checkbox"] {
+    width: 14px; height: 14px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .check-field label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-mid);
+    cursor: pointer;
+  }
+
+  /* 実行ボタン */
+  .btn-run {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 3px;
+    color: var(--bg);
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    text-transform: uppercase;
+  }
+  .btn-run:hover:not(:disabled) { opacity: 0.88; }
+  .btn-run:active:not(:disabled) { transform: scale(0.99); }
+  .btn-run:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* ── 右パネル ── */
+  .panel-right {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ログ領域 */
+  .log-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 32px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  .log-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    color: var(--text-soft);
+  }
+  .log-empty-icon {
+    font-size: 40px;
+    opacity: 0.3;
+  }
+  .log-empty-text {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .log-entry {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 16px;
+    padding: 3px 0;
+    border-bottom: 1px solid transparent;
+    animation: fadeIn 0.15s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  .log-time { color: var(--text-soft); }
+  .log-msg  { color: var(--text); }
+  .log-ok   { color: var(--ok); }
+  .log-warn { color: var(--accent); }
+  .log-err  { color: var(--err); }
+  .log-head {
+    grid-column: 1 / -1;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin: 12px 0 6px;
+    letter-spacing: 0.06em;
+  }
+  .log-head:first-child { margin-top: 0; }
+
+  /* 結果バー */
+  .result-bar {
+    border-top: 1px solid var(--border);
+    padding: 14px 32px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .result-stat {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .stat-label { color: var(--text-soft); }
+  .stat-val   { color: var(--text); font-weight: 500; }
+  .stat-ok    { color: var(--ok); }
+  .stat-err   { color: var(--err); }
+
+  .btn-download-all {
+    margin-left: auto;
+    padding: 7px 18px;
+    background: none;
+    border: 1px solid var(--accent-dim);
+    border-radius: 3px;
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: background 0.15s;
+    text-transform: uppercase;
+  }
+  .btn-download-all:hover { background: var(--accent-glow); }
+  .btn-download-all:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* プレビューモーダル */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    width: min(760px, 90vw);
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .modal-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    flex: 1;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--text-soft);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+    transition: color 0.15s;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .modal-body pre {
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+    color: var(--text-mid);
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .btn-sm {
+    padding: 6px 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: opacity 0.15s;
+  }
+  .btn-sm-ghost {
+    background: none;
+    border: 1px solid var(--border-light);
+    color: var(--text-mid);
+  }
+  .btn-sm-ghost:hover { border-color: var(--text-soft); }
+  .btn-sm-primary {
+    background: var(--accent);
+    border: none;
+    color: var(--bg);
+    font-weight: 500;
+  }
+  .btn-sm-primary:hover { opacity: 0.85; }
+
+  /* スクロールバー */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
+
+  /* フッター */
+  footer {
+    position: relative;
+    z-index: 10;
+    border-top: 1px solid var(--border);
+    padding: 10px 36px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-soft);
+    display: flex;
+    gap: 20px;
+    background: var(--surface);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">MZ-AniCharaDB</span>
+  <h1>Bulk JSON Splitter</h1>
+  <span class="header-badge">GUI v2.0</span>
+</header>
+
+<main>
+
+  <!-- 左パネル：設定 -->
+  <aside class="panel-left">
+
+    <!-- ファイル選択 -->
+    <div class="panel-section">
+      <div class="section-label">Input Files</div>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="file-input" accept=".json" multiple>
+        <div class="dropzone-icon">⬇</div>
+        <div class="dropzone-text">JSONファイルをドロップ<br>または クリックして選択</div>
+        <div class="dropzone-sub">複数ファイル同時読み込み対応 · .json</div>
+      </div>
+      <div class="file-list" id="file-list"></div>
+    </div>
+
+    <!-- ファイル名設定 -->
+    <div class="panel-section">
+      <div class="section-label">Filename Pattern</div>
+      <div class="field">
+        <label>ファイル名テンプレート</label>
+        <select id="filename-template">
+          <option value="work_name_branch">{work}_{name}_{branch}.json</option>
+          <option value="work_name">{work}_{name}.json</option>
+          <option value="name_only">{name}.json</option>
+          <option value="uuid">{uuid}.json</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>サブフォルダ分割キー（任意）</label>
+        <select id="group-by">
+          <option value="none">分割しない（フラット）</option>
+          <option value="work">作品名 (work) で分割</option>
+          <option value="branch">ブランチ (branch) で分割</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- オプション -->
+    <div class="panel-section">
+      <div class="section-label">Options</div>
+      <div class="check-field">
+        <input type="checkbox" id="opt-overwrite" checked>
+        <label for="opt-overwrite">同名ファイルを上書き</label>
+      </div>
+      <div class="check-field">
+        <input type="checkbox" id="opt-validate" checked>
+        <label for="opt-validate">name / work の存在を検証</label>
+      </div>
+      <div class="check-field">
+        <input type="checkbox" id="opt-preview" checked>
+        <label for="opt-preview">完了後に結果プレビューを表示</label>
+      </div>
+      <div class="check-field">
+        <input type="checkbox" id="opt-indent" checked>
+        <label for="opt-indent">整形出力（indent 2）</label>
+      </div>
+    </div>
+
+    <!-- 実行 -->
+    <div class="panel-section">
+      <button class="btn-run" id="btn-run" disabled>
+        ▶ SPLIT &amp; DOWNLOAD
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- 右パネル：ログ -->
+  <div class="panel-right">
+    <div class="log-area" id="log-area">
+      <div class="log-empty" id="log-empty">
+        <div class="log-empty-icon">◈</div>
+        <div class="log-empty-text">Waiting for input…</div>
+      </div>
+    </div>
+    <div class="result-bar" id="result-bar">
+      <div class="result-stat">
+        <span class="stat-label">FILES</span>
+        <span class="stat-val" id="stat-files">—</span>
+      </div>
+      <div class="result-stat">
+        <span class="stat-label">ENTRIES</span>
+        <span class="stat-val" id="stat-entries">—</span>
+      </div>
+      <div class="result-stat">
+        <span class="stat-label">OK</span>
+        <span class="stat-ok" id="stat-ok">—</span>
+      </div>
+      <div class="result-stat">
+        <span class="stat-label">SKIP</span>
+        <span class="stat-err" id="stat-skip">—</span>
+      </div>
+      <button class="btn-download-all" id="btn-dl-all" disabled>
+        ⬇ ZIP DOWNLOAD
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  <span>MZ-AniCharaDB Bulk Splitter GUI v2.0</span>
+  <span>·</span>
+  <span>schema v1.0 compatible</span>
+  <span>·</span>
+  <span>ブラウザ完結 · サーバー送信なし</span>
+</footer>
+
+<!-- プレビューモーダル -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Result Preview</span>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <pre id="modal-body"></pre>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sm btn-sm-ghost" id="modal-close2">閉じる</button>
+      <button class="btn-sm btn-sm-primary" id="modal-dl">⬇ ZIP ダウンロード</button>
+    </div>
+  </div>
+</div>
+
+<!-- JSZip CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ── 状態管理 ──────────────────────────────────────────────
+const state = {
+  files: [],        // { name, size, raw, parsed, error }
+  results: [],      // 処理済みエントリ { filename, json, ok, reason }
+};
+
+// ── DOM参照 ───────────────────────────────────────────────
+const dropzone   = document.getElementById('dropzone');
+const fileInput  = document.getElementById('file-input');
+const fileList   = document.getElementById('file-list');
+const btnRun     = document.getElementById('btn-run');
+const btnDlAll   = document.getElementById('btn-dl-all');
+const logArea    = document.getElementById('log-area');
+const logEmpty   = document.getElementById('log-empty');
+const modal      = document.getElementById('modal');
+const modalTitle = document.getElementById('modal-title');
+const modalBody  = document.getElementById('modal-body');
+
+// ── ファイル投入 ──────────────────────────────────────────
+fileInput.addEventListener('change', e => handleFiles([...e.target.files]));
+
+dropzone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropzone.classList.add('drag-over');
+});
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('drag-over');
+  handleFiles([...e.dataTransfer.files].filter(f => f.name.endsWith('.json')));
+});
+
+function handleFiles(files) {
+  files.forEach(file => {
+    if (state.files.find(f => f.name === file.name)) return; // 重複スキップ
+    const reader = new FileReader();
+    reader.onload = e => {
+      let parsed = null, error = null;
+      try {
+        parsed = JSON.parse(e.target.result);
+        if (!Array.isArray(parsed)) error = '配列形式ではありません';
+      } catch(ex) {
+        error = 'JSON parse error: ' + ex.message;
+      }
+      state.files.push({ name: file.name, size: file.size, raw: e.target.result, parsed, error });
+      renderFileList();
+      updateRunBtn();
+    };
+    reader.readAsText(file, 'utf-8');
+  });
+}
+
+function renderFileList() {
+  fileList.innerHTML = '';
+  state.files.forEach((f, i) => {
+    const item = document.createElement('div');
+    item.className = 'file-item';
+    const count = f.parsed ? `${f.parsed.length} entries` : '—';
+    const sizeStr = f.size > 1024 ? `${(f.size/1024).toFixed(1)} KB` : `${f.size} B`;
+    item.innerHTML = `
+      <div style="overflow:hidden">
+        <div class="file-name" title="${f.name}">${f.error ? '⚠ ' : ''}${f.name}</div>
+        <div class="file-meta" style="color:${f.error?'var(--err)':'var(--text-soft)'}">${f.error || count + ' · ' + sizeStr}</div>
+      </div>
+      <button class="file-remove" data-i="${i}" title="削除">×</button>
+    `;
+    fileList.appendChild(item);
+  });
+  fileList.querySelectorAll('.file-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.files.splice(+btn.dataset.i, 1);
+      renderFileList();
+      updateRunBtn();
+    });
+  });
+}
+
+function updateRunBtn() {
+  const valid = state.files.some(f => f.parsed && !f.error);
+  btnRun.disabled = !valid;
+}
+
+// ── ログ出力 ──────────────────────────────────────────────
+function log(msg, type = '') {
+  if (logEmpty) logEmpty.style.display = 'none';
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}.${String(now.getMilliseconds()).padStart(3,'0')}`;
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${time}</span><span class="log-msg ${type ? 'log-'+type : ''}">${msg}</span>`;
+  logArea.appendChild(entry);
+  logArea.scrollTop = logArea.scrollHeight;
+}
+
+function logHead(msg) {
+  if (logEmpty) logEmpty.style.display = 'none';
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-head">── ${msg} ──</span>`;
+  logArea.appendChild(entry);
+}
+
+function clearLog() {
+  logArea.innerHTML = '';
+}
+
+// ── ファイル名生成 ────────────────────────────────────────
+function sanitize(s) {
+  return String(s).replace(/[\\/*?:"<>|]/g, '_');
+}
+
+function buildFilename(entry, template) {
+  const work   = sanitize(entry.work   || entry.header?.work   || 'unknown_work');
+  const name   = sanitize(entry.name   || entry.header?.name   || 'unknown_name');
+  const branch = sanitize(entry.header?.branch || '001');
+  const uuid   = entry.header?.uuid || crypto.randomUUID();
+  switch(template) {
+    case 'work_name':       return `${work}_${name}.json`;
+    case 'name_only':       return `${name}.json`;
+    case 'uuid':            return `${uuid}.json`;
+    default:                return `${work}_${name}_${branch}.json`;
+  }
+}
+
+function buildPath(entry, filename, groupBy) {
+  if (groupBy === 'work') {
+    const dir = sanitize(entry.work || entry.header?.work || 'unknown');
+    return `${dir}/${filename}`;
+  }
+  if (groupBy === 'branch') {
+    const dir = sanitize(entry.header?.branch || '001');
+    return `${dir}/${filename}`;
+  }
+  return filename;
+}
+
+// ── メイン処理 ────────────────────────────────────────────
+btnRun.addEventListener('click', async () => {
+  clearLog();
+  state.results = [];
+  btnRun.disabled = true;
+  btnDlAll.disabled = true;
+
+  const template  = document.getElementById('filename-template').value;
+  const groupBy   = document.getElementById('group-by').value;
+  const validate  = document.getElementById('opt-validate').checked;
+  const doPreview = document.getElementById('opt-preview').checked;
+  const indent    = document.getElementById('opt-indent').checked ? 2 : 0;
+
+  const validFiles = state.files.filter(f => f.parsed && !f.error);
+  let totalEntries = 0, okCount = 0, skipCount = 0;
+  const seenPaths = new Set();
+
+  logHead(`処理開始 · ${validFiles.length} ファイル`);
+
+  for (const file of validFiles) {
+    logHead(file.name);
+    const entries = file.parsed;
+    log(`${entries.length} エントリを検出`, 'ok');
+
+    for (let i = 0; i < entries.length; i++) {
+      totalEntries++;
+      const entry = entries[i];
+
+      // バリデーション
+      if (validate) {
+        if (!entry.name && !entry.header?.name) {
+          log(`[${i}] SKIP — name フィールドなし`, 'err');
+          state.results.push({ path: null, json: null, ok: false, reason: 'name missing' });
+          skipCount++;
+          continue;
+        }
+        if (!entry.work && !entry.header?.work) {
+          log(`[${i}] SKIP — work フィールドなし`, 'err');
+          state.results.push({ path: null, json: null, ok: false, reason: 'work missing' });
+          skipCount++;
+          continue;
+        }
+      }
+
+      const filename = buildFilename(entry, template);
+      let   filePath = buildPath(entry, filename, groupBy);
+
+      // 重複処理
+      if (seenPaths.has(filePath)) {
+        const overwrite = document.getElementById('opt-overwrite').checked;
+        if (!overwrite) {
+          const ext = filePath.lastIndexOf('.');
+          filePath  = filePath.slice(0, ext) + `_${i}` + filePath.slice(ext);
+          log(`[${i}] RENAME → ${filePath}`, 'warn');
+        }
+      }
+      seenPaths.add(filePath);
+
+      const jsonStr = JSON.stringify(entry, null, indent);
+      state.results.push({ path: filePath, json: jsonStr, ok: true });
+      log(`[${i}] ✓ ${filePath}`, 'ok');
+      okCount++;
+
+      // 100件ごとに非同期で息継ぎ
+      if (i % 100 === 0) await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  logHead('完了');
+  log(`合計 ${totalEntries} / OK ${okCount} / SKIP ${skipCount}`, okCount > 0 ? 'ok' : 'err');
+
+  // 統計更新
+  document.getElementById('stat-files').textContent   = validFiles.length;
+  document.getElementById('stat-entries').textContent = totalEntries;
+  document.getElementById('stat-ok').textContent      = okCount;
+  document.getElementById('stat-skip').textContent    = skipCount;
+
+  btnRun.disabled  = false;
+  btnDlAll.disabled = okCount === 0;
+
+  if (doPreview && okCount > 0) showPreview(okCount, skipCount);
+});
+
+// ── プレビューモーダル ────────────────────────────────────
+function showPreview(ok, skip) {
+  const lines = state.results
+    .filter(r => r.ok)
+    .slice(0, 30)
+    .map(r => `  ✓  ${r.path}`)
+    .join('\n');
+  const more = ok > 30 ? `\n  … 他 ${ok - 30} 件` : '';
+  modalTitle.textContent = `Split Result — ${ok} files`;
+  modalBody.textContent  = `出力ファイル一覧（先頭30件）:\n\n${lines}${more}\n\n` +
+    `──\nOK: ${ok}  SKIP: ${skip}\nZIPダウンロードで全ファイルを一括取得できます。`;
+  modal.classList.add('open');
+}
+
+document.getElementById('modal-close').addEventListener('click', () => modal.classList.remove('open'));
+document.getElementById('modal-close2').addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', e => { if (e.target === modal) modal.classList.remove('open'); });
+
+// ── ZIPダウンロード ───────────────────────────────────────
+async function downloadZip() {
+  const zip = new JSZip();
+  state.results.filter(r => r.ok).forEach(r => zip.file(r.path, r.json));
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,16).replace(/[-T:]/g, '').replace('T','_');
+  a.href = url;
+  a.download = `split_${stamp}.zip`;
+  a.click();
+  URL.revokeObjectURL(url);
+  log(`ZIP saved: split_${stamp}.zip`, 'ok');
+  modal.classList.remove('open');
+}
+
+btnDlAll.addEventListener('click', downloadZip);
+document.getElementById('modal-dl').addEventListener('click', downloadZip);
+</script>
+</body>
+</html>
