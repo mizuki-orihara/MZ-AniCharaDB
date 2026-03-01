@@ -2,7 +2,7 @@
 /**
  * indexer_add.php
  * 役割: mainDB/registercache/ の新規カードを mainDB/ に移動し、
- *       index.json に追記する
+ *       index.json と search_index.json に追記する
  *
  * 処理完了もexit(0)
  * エラーはexit(1)
@@ -24,7 +24,7 @@ $success_count = 0;
 $fail_count    = 0;
 
 // registercache/ のJSONを取得
-$files = glob(DIR_REGISTERCACHE . '/' . '*.json') ?: [];
+$files = glob(DIR_REGISTERCACHE . '/*.json') ?: [];
 $files = array_filter($files, fn($f) => basename($f) !== 'indexer_add_status.json');
 if (empty($files)) {
     write_status(0, 0, 'No files in registercache.');
@@ -36,6 +36,18 @@ $index = file_exists(INDEX_JSON)
     ? json_decode(file_get_contents(INDEX_JSON), true) ?? []
     : [];
 
+// search_index.json を読み込む（なければ空配列）
+$search_index_path = DIR_API . '/search_index.json';
+$search_index = file_exists($search_index_path)
+    ? json_decode(file_get_contents($search_index_path), true) ?? []
+    : [];
+
+// search_index を filename => entry のマップに変換（重複排除用）
+$search_map = [];
+foreach ($search_index as $entry) {
+    $search_map[$entry['filename']] = $entry;
+}
+
 // 増分をメモリ内で管理
 $additions = [];
 
@@ -43,16 +55,17 @@ foreach ($files as $src_path) {
     $filename  = basename($src_path);
     $dest_path = DIR_MAIN_DB . '/' . $filename;
 
-    // JSONからcard_idとcontent_hashを取得
     $card = json_decode(file_get_contents($src_path), true);
     if ($card === null) {
         $fail_count++;
         continue;
     }
+
     $hash    = $card['header']['content_hash'] ?? '';
-    $card_id = ($card['header']['work']   ?? '')
-             . '_' . ($card['header']['name']   ?? '')
-             . '_' . ($card['header']['branch'] ?? '');
+    $work    = $card['header']['work']         ?? '';
+    $name    = $card['header']['name']         ?? '';
+    $branch  = $card['header']['branch']       ?? '';
+    $card_id = "{$work}_{$name}_{$branch}";
 
     // mainDB/ に移動
     if (!rename($src_path, $dest_path)) {
@@ -60,15 +73,30 @@ foreach ($files as $src_path) {
         continue;
     }
 
-    // メモリ内に増分を積む（キーはcard_id）
+    // index への増分（キーはcard_id）
     $additions[$card_id] = $hash;
+
+    // search_index への増分
+    $search_map[$filename] = [
+        'filename' => $filename,
+        'card_id'  => $card_id,
+        'work'     => $work,
+        'name'     => $name,
+        'branch'   => $branch,
+    ];
+
     $success_count++;
 }
 
-// 既存index + 増分をマージして1回だけ書き出す
+// index.json 書き出し
 $merged_index = array_merge($index, $additions);
 file_put_contents(INDEX_JSON,
     json_encode($merged_index, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+);
+
+// search_index.json 書き出し（配列に戻す）
+file_put_contents($search_index_path,
+    json_encode(array_values($search_map), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
 );
 
 write_status($success_count, $fail_count, 'Done.');

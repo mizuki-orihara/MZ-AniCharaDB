@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Editor ? MZ-AniCharaDB</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        :root {
+            --bg: #0e0f11;
+            --surface: #161820;
+            --border: #2a2d38;
+            --accent: #5b8dee;
+            --accent2: #e05b8d;
+            --accent3: #e0a05b;
+            --text: #d4d8e8;
+            --text-dim: #6b7094;
+            --mono: 'JetBrains Mono', monospace;
+            --sans: 'Noto Sans JP', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 13px;
+            line-height: 1.6;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ===== サイドバー ===== */
+        #sidebar {
+            width: 280px;
+            min-width: 280px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+            #sidebar-header h1 {
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                color: var(--accent);
+                margin-bottom: 8px;
+            }
+
+        #search-input {
+            width: 100%;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 6px 10px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 11px;
+            outline: none;
+        }
+
+            #search-input:focus {
+                border-color: var(--accent);
+            }
+
+            #search-input::placeholder {
+                color: var(--text-dim);
+            }
+
+        #search-hint {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-top: 5px;
+        }
+
+        #candidate-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+
+            #candidate-list::-webkit-scrollbar {
+                width: 4px;
+            }
+
+            #candidate-list::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 2px;
+            }
+
+        .candidate-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.15s;
+        }
+
+            .candidate-item:hover {
+                background: rgba(91,141,238,0.07);
+            }
+
+            .candidate-item.active {
+                background: rgba(91,141,238,0.12);
+                border-left-color: var(--accent);
+            }
+
+            .candidate-item .c-work {
+                font-size: 10px;
+                color: var(--text-dim);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .candidate-item .c-name {
+                font-size: 12px;
+                font-weight: 500;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .candidate-item .c-branch {
+                font-size: 10px;
+                color: var(--accent);
+                font-family: var(--mono);
+            }
+
+        /* ===== メインエリア ===== */
+        #main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #main-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+            #main-header .card-id {
+                font-family: var(--mono);
+                font-size: 11px;
+                color: var(--text-dim);
+                flex: 1;
+            }
+
+        #btn-save {
+            padding: 7px 20px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-family: var(--sans);
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+            #btn-save:hover {
+                opacity: 0.85;
+            }
+
+            #btn-save:disabled {
+                opacity: 0.3;
+                cursor: default;
+            }
+
+        /* ===== テーブルエリア ===== */
+        #table-wrap {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+        }
+
+            #table-wrap::-webkit-scrollbar {
+                width: 4px;
+            }
+
+            #table-wrap::-webkit-scrollbar-thumb {
+                background: var(--border);
+                border-radius: 2px;
+            }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            background: var(--bg);
+            z-index: 1;
+        }
+
+            thead th.col-key {
+                width: 22%;
+            }
+
+            thead th.col-val {
+                width: 63%;
+            }
+
+            thead th.col-lock {
+                width: 15%;
+            }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.1s;
+        }
+
+            tbody tr:hover {
+                background: rgba(255,255,255,0.02);
+            }
+
+            tbody tr.is-locked {
+                background: rgba(42,45,56,0.4);
+            }
+
+            tbody tr.is-unlocked {
+                background: rgba(224,160,91,0.06);
+            }
+
+        td {
+            padding: 8px 12px;
+            vertical-align: middle;
+        }
+
+            td.key-cell {
+                font-family: var(--mono);
+                font-size: 11px;
+                color: var(--text-dim);
+                font-weight: 500;
+            }
+
+                td.key-cell.core {
+                    color: var(--text);
+                }
+
+            td.val-cell {
+                font-family: var(--mono);
+                font-size: 11px;
+            }
+
+                /* 編集可能セル */
+                td.val-cell .editable {
+                    width: 100%;
+                    background: transparent;
+                    border: 1px solid transparent;
+                    border-radius: 3px;
+                    padding: 3px 6px;
+                    color: var(--text);
+                    font-family: var(--mono);
+                    font-size: 11px;
+                    outline: none;
+                    transition: border-color 0.15s, background 0.15s;
+                    resize: none;
+                }
+
+                    td.val-cell .editable:hover {
+                        border-color: var(--border);
+                        background: rgba(0,0,0,0.2);
+                    }
+
+                    td.val-cell .editable:focus {
+                        border-color: var(--accent);
+                        background: rgba(0,0,0,0.3);
+                    }
+
+                    td.val-cell .editable.modified {
+                        border-color: var(--accent3);
+                        background: rgba(224,160,91,0.08);
+                    }
+
+                /* ロックされた値 */
+                td.val-cell .locked-val {
+                    padding: 3px 6px;
+                    color: var(--text-dim);
+                    display: block;
+                }
+
+                /* JSONオブジェクト表示 */
+                td.val-cell pre {
+                    white-space: pre-wrap;
+                    word-break: break-all;
+                    max-height: 100px;
+                    overflow-y: auto;
+                    background: rgba(0,0,0,0.2);
+                    padding: 5px 8px;
+                    border-radius: 4px;
+                    font-size: 10px;
+                    color: var(--text-dim);
+                }
+
+            /* ロック列 */
+            td.lock-cell {
+                text-align: center;
+            }
+
+        .lock-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .btn-unlock {
+            padding: 2px 7px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            color: var(--text-dim);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+
+            .btn-unlock:hover {
+                border-color: var(--accent3);
+                color: var(--accent3);
+            }
+
+            .btn-unlock.unlocked {
+                border-color: var(--accent3);
+                color: var(--accent3);
+                background: rgba(224,160,91,0.1);
+            }
+
+        /* ===== 空・ロード状態 ===== */
+        #empty-state, #loading-state {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            gap: 8px;
+        }
+
+        .state-icon {
+            font-size: 28px;
+        }
+
+        .state-msg {
+            font-size: 12px;
+        }
+
+        /* ===== トースト ===== */
+        #toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+
+            #toast.show {
+                opacity: 1;
+            }
+
+            #toast.ok {
+                background: #1a3a1a;
+                border: 1px solid #5be05b;
+                color: #5be05b;
+            }
+
+            #toast.err {
+                background: #3a1a1a;
+                border: 1px solid var(--accent2);
+                color: var(--accent2);
+            }
+
+            #toast.warn {
+                background: #2f2010;
+                border: 1px solid var(--accent3);
+                color: var(--accent3);
+            }
+    </style>
+</head>
+<body>
+
+    <!-- サイドバー -->
+    <div id="sidebar">
+        <div id="sidebar-header">
+            <h1>Card Editor</h1>
+            <input type="text" id="search-input" placeholder="card_idで前方一致検索...">
+            <div id="search-hint">0件</div>
+        </div>
+        <div id="candidate-list"></div>
+    </div>
+
+    <!-- メインエリア -->
+    <div id="main">
+        <div id="main-header">
+            <div class="card-id" id="current-card-id">?</div>
+            <button id="btn-save" disabled>保存して送信</button>
+        </div>
+        <div id="empty-state">
+            <div class="state-icon">?</div>
+            <div class="state-msg">左の検索からカードを選択してください</div>
+        </div>
+        <div id="loading-state" style="display:none">
+            <div class="state-icon">?</div>
+            <div class="state-msg">読み込み中...</div>
+        </div>
+        <div id="table-wrap" style="display:none">
+            <table>
+                <thead>
+                    <tr>
+                        <th class="col-key">キー</th>
+                        <th class="col-val">値</th>
+                        <th class="col-lock">ロック</th>
+                    </tr>
+                </thead>
+                <tbody id="edit-tbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- トースト -->
+    <div id="toast"></div>
+
+    <script>
+const API_URL        = './card_editor_api.php';
+const SEARCH_IDX_URL = '../API/search_index.json';
+
+// コア項目
+const CORE_KEYS = new Set(['schema', 'uuid', 'content_hash', 'generated_at', 'branch', 'work', 'name']);
+
+// ===== 状態 =====
+let searchIndex   = [];  // [{filename, card_id, work, name, branch}, ...]
+let currentCardId = null;
+let currentCard   = null;
+let currentFile   = null;
+let unlockedKeys  = new Set();
+let editedValues  = {};  // key_path => new value
+
+// ===== 初期化 =====
+window.addEventListener('DOMContentLoaded', async () => {
+  await loadSearchIndex();
+  document.getElementById('search-input').addEventListener('input', onSearch);
+  document.getElementById('btn-save').addEventListener('click', onSave);
+});
+
+// ===== search_index.json 読み込み =====
+async function loadSearchIndex() {
+  try {
+    const res   = await fetch(SEARCH_IDX_URL);
+    searchIndex = await res.json();
+    document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
+  } catch(e) {
+    document.getElementById('search-hint').textContent = 'search_index.json 読み込み失敗';
+  }
+}
+
+// ===== 検索 =====
+function onSearch() {
+  const q    = document.getElementById('search-input').value.trim().toLowerCase();
+  const list = document.getElementById('candidate-list');
+  list.innerHTML = '';
+
+  if (q.length < 1) {
+    document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
+    return;
+  }
+
+  const matched = searchIndex.filter(e =>
+    e.card_id.toLowerCase().includes(q) ||
+    e.work.toLowerCase().includes(q) ||
+    e.name.toLowerCase().includes(q)
+  );
+  document.getElementById('search-hint').textContent = `${matched.length}件一致`;
+
+  matched.slice(0, 50).forEach(entry => {
+    const el = document.createElement('div');
+    el.className = 'candidate-item';
+    el.innerHTML = `
+      <div class="c-work">${escHtml(entry.work)}</div>
+      <div class="c-name">${escHtml(entry.name)}</div>
+      <div class="c-branch">${escHtml(entry.branch)}</div>
+    `;
+    el.addEventListener('click', () => selectCard(entry.card_id, entry.filename, el));
+    list.appendChild(el);
+  });
+}
+
+// ===== カード選択・読み込み =====
+async function selectCard(cardId, filename, el) {
+  document.querySelectorAll('.candidate-item').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+
+  currentCardId = cardId;
+  currentFile   = filename;
+  unlockedKeys  = new Set();
+  editedValues  = {};
+
+  document.getElementById('current-card-id').textContent = cardId;
+  document.getElementById('btn-save').disabled = true;
+  document.getElementById('table-wrap').style.display    = 'none';
+  document.getElementById('empty-state').style.display   = 'none';
+  document.getElementById('loading-state').style.display = 'flex';
+
+  try {
+    const res  = await fetch(`${API_URL}?mode=load&filename=${encodeURIComponent(filename)}`);
+    const data = await res.json();
+
+    if (data.status !== 'ok') {
+      showToast('読み込みエラー: ' + (data.message ?? '不明'), 'err');
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('empty-state').style.display   = 'flex';
+      return;
+    }
+
+    currentCard = data.card;
+
+    renderTable();
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('table-wrap').style.display    = 'block';
+    document.getElementById('btn-save').disabled = false;
+
+  } catch(e) {
+    showToast('通信エラー', 'err');
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('empty-state').style.display   = 'flex';
+  }
+}
+
+// ===== テーブル描画 =====
+function renderTable() {
+  const tbody = document.getElementById('edit-tbody');
+  tbody.innerHTML = '';
+
+  const flat = flattenCard(currentCard);
+
+  // header系を先頭に
+  const headerKeys = Object.keys(flat).filter(k => k.startsWith('header.'));
+  const otherKeys  = Object.keys(flat).filter(k => !k.startsWith('header.')).sort();
+  const orderedKeys = [...headerKeys, ...otherKeys];
+
+  orderedKeys.forEach(keyPath => {
+    const topKey = keyPath.startsWith('header.')
+      ? keyPath.split('.')[1]
+      : keyPath.split('.')[0];
+    const isCore     = CORE_KEYS.has(topKey);
+    const isUnlocked = unlockedKeys.has(keyPath);
+    const val        = flat[keyPath];
+    const isObj      = val !== null && typeof val === 'object';
+
+    const tr = document.createElement('tr');
+    tr.classList.toggle('is-locked',   isCore && !isUnlocked);
+    tr.classList.toggle('is-unlocked', isCore && isUnlocked);
+    tr.dataset.key = keyPath;
+
+    // キー列
+    const tdKey = document.createElement('td');
+    tdKey.className = 'key-cell' + (isCore ? ' core' : '');
+    tdKey.textContent = keyPath;
+
+    // 値列
+    const tdVal = document.createElement('td');
+    tdVal.className = 'val-cell';
+
+    if (isObj) {
+      // オブジェクト・配列は表示のみ
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(val, null, 2);
+      tdVal.appendChild(pre);
+    } else if (isCore && !isUnlocked) {
+      // ロックされたコア項目
+      const span = document.createElement('span');
+      span.className = 'locked-val';
+      span.textContent = val ?? '?';
+      tdVal.appendChild(span);
+    } else {
+      // 編集可能
+      const currentVal = editedValues[keyPath] !== undefined ? editedValues[keyPath] : (val ?? '');
+      const input = document.createElement('textarea');
+      input.className = 'editable' + (editedValues[keyPath] !== undefined ? ' modified' : '');
+      input.rows = 1;
+      input.value = currentVal;
+      input.dataset.key = keyPath;
+      input.dataset.original = String(val ?? '');
+      input.addEventListener('input', onEdit);
+      tdVal.appendChild(input);
+    }
+
+    // ロック列
+    const tdLock = document.createElement('td');
+    tdLock.className = 'lock-cell';
+
+    if (isObj) {
+      const span = document.createElement('span');
+      span.className = 'lock-badge';
+      span.textContent = '{…}';
+      tdLock.appendChild(span);
+    } else if (isCore) {
+      const btn = document.createElement('button');
+      btn.className = 'btn-unlock' + (isUnlocked ? ' unlocked' : '');
+      btn.textContent = isUnlocked ? '  解除中' : '  解除';
+      btn.dataset.key = keyPath;
+      btn.addEventListener('click', () => toggleUnlock(keyPath));
+      tdLock.appendChild(btn);
+    }
+
+    tr.appendChild(tdKey);
+    tr.appendChild(tdVal);
+    tr.appendChild(tdLock);
+    tbody.appendChild(tr);
+  });
+}
+
+// ===== 編集検知 =====
+function onEdit(e) {
+  const key      = e.target.dataset.key;
+  const original = e.target.dataset.original;
+  const current  = e.target.value;
+
+  if (current !== original) {
+    editedValues[key] = current;
+    e.target.classList.add('modified');
+  } else {
+    delete editedValues[key];
+    e.target.classList.remove('modified');
+  }
+}
+
+// ===== コアロック解除 =====
+function toggleUnlock(keyPath) {
+  if (unlockedKeys.has(keyPath)) {
+    unlockedKeys.delete(keyPath);
+    // 編集値もリセット
+    delete editedValues[keyPath];
+  } else {
+    unlockedKeys.add(keyPath);
+  }
+  renderTable();
+}
+
+// ===== 保存 =====
+async function onSave() {
+  if (!currentCard || !currentFile) return;
+
+  if (Object.keys(editedValues).length === 0) {
+    showToast('変更がありません', 'warn');
+    return;
+  }
+
+  const payload = {
+    card_id:  currentCardId,
+    filename: currentFile,
+    edits:    editedValues,
+  };
+
+  try {
+    const res  = await fetch(API_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (data.status === 'ok') {
+      showToast('保存しました: ' + (data.new_file ?? ''), 'ok');
+      // 保存後はリセット
+      currentCard   = null;
+      currentFile   = null;
+      currentCardId = null;
+      editedValues  = {};
+      unlockedKeys  = new Set();
+      document.getElementById('table-wrap').style.display  = 'none';
+      document.getElementById('empty-state').style.display = 'flex';
+      document.getElementById('current-card-id').textContent = '?';
+      document.getElementById('btn-save').disabled = true;
+      // search_indexを再読み込み
+      await loadSearchIndex();
+      document.getElementById('search-input').value = '';
+      document.getElementById('candidate-list').innerHTML = '';
+      document.getElementById('search-hint').textContent = `${searchIndex.length}件`;
+    } else {
+      showToast('エラー: ' + (data.message ?? '不明'), 'err');
+    }
+  } catch(e) {
+    showToast('送信に失敗しました', 'err');
+  }
+}
+
+// ===== ユーティリティ =====
+function flattenCard(card) {
+  const result = {};
+  for (const [key, val] of Object.entries(card ?? {})) {
+    if (key === 'header') {
+      for (const [hk, hv] of Object.entries(val ?? {})) {
+        result[`header.${hk}`] = hv;
+      }
+    } else if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+      for (const [sk, sv] of Object.entries(val)) {
+        result[`${key}.${sk}`] = sv;
+      }
+    } else {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function showToast(msg, type = 'ok') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  setTimeout(() => { el.className = ''; }, 3500);
+}
+    </script>
+</body>
+</html>

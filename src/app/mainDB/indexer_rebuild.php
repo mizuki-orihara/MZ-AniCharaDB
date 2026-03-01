@@ -1,7 +1,7 @@
 <?php
 /**
  * indexer_rebuild.php
- * 役割: mainDB/ 全JSONを走査して index.json を一から作り直す
+ * 役割: mainDB/ 全JSONを走査して index.json と search_index.json を一から作り直す
  *       初回セットアップ・整合性修復用
  *
  * 処理完了もexit(0)
@@ -23,20 +23,18 @@ $start_time    = microtime(true);
 $success_count = 0;
 $fail_count    = 0;
 
-// mainDB/ のJSON全件取得（index.json自体は除外）
-$files = glob(DIR_MAIN_DB . '/' . '*.json') ?: [];
-$files = array_filter($files, fn($f) => !in_array(basename($f), [
-    'index.json',
-    'indexer_add_status.json',
-    'indexer_rebuild_status.json',
-]));
+// mainDB/ のJSON全件取得（除外ファイル指定）
+$exclude = ['index.json', 'indexer_add_status.json', 'indexer_rebuild_status.json'];
+$files   = glob(DIR_MAIN_DB . '/*.json') ?: [];
+$files   = array_filter($files, fn($f) => !in_array(basename($f), $exclude, true));
 
-// index.json を削除してリセット
-if (file_exists(INDEX_JSON)) {
-    unlink(INDEX_JSON);
-}
+// index.json・search_index.json をリセット
+$search_index_path = DIR_API . '/search_index.json';
+if (file_exists(INDEX_JSON))        unlink(INDEX_JSON);
+if (file_exists($search_index_path)) unlink($search_index_path);
 
-$index = [];
+$index      = [];
+$search_map = [];
 
 foreach ($files as $file_path) {
     $filename = basename($file_path);
@@ -46,19 +44,36 @@ foreach ($files as $file_path) {
         $fail_count++;
         continue;
     }
+
     $hash    = $card['header']['content_hash'] ?? '';
-    $card_id = ($card['header']['work']   ?? '')
-             . '_' . ($card['header']['name']   ?? '')
-             . '_' . ($card['header']['branch'] ?? '');
+    $work    = $card['header']['work']         ?? '';
+    $name    = $card['header']['name']         ?? '';
+    $branch  = $card['header']['branch']       ?? '';
+    $card_id = "{$work}_{$name}_{$branch}";
 
     // 同card_idが既にある場合は上書き（最後に走査したものが残る）
     $index[$card_id] = $hash;
+
+    // search_index はfilenameをキーにして重複排除
+    $search_map[$filename] = [
+        'filename' => $filename,
+        'card_id'  => $card_id,
+        'work'     => $work,
+        'name'     => $name,
+        'branch'   => $branch,
+    ];
+
     $success_count++;
 }
 
-// index.json を新規作成
+// index.json 書き出し
 file_put_contents(INDEX_JSON,
     json_encode($index, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+);
+
+// search_index.json 書き出し
+file_put_contents($search_index_path,
+    json_encode(array_values($search_map), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
 );
 
 write_status($success_count, $fail_count, 'Rebuild complete.');
