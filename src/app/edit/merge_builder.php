@@ -51,6 +51,7 @@ $selections  = $body['selections']  ?? [];
 if (empty($card_id) || empty($maindb_file) || empty($merge_file) || empty($selections)) {
     http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'Missing required fields.']);
+    echo json_encode(['status' => 'error', 'message' => '必須フィールドが不足しています。']);
     exit;
 }
 
@@ -62,11 +63,13 @@ $merge_path   = DIR_MERGE   . '/' . basename($merge_file);
 if (!file_exists($maindb_path)) {
     http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'mainDB file not found: ' . $maindb_file]);
+    echo json_encode(['status' => 'error', 'message' => 'mainDBファイルが見つかりません: ' . $maindb_file]);
     exit;
 }
 if (!file_exists($merge_path)) {
     http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'merge file not found: ' . $merge_file]);
+    echo json_encode(['status' => 'error', 'message' => 'mergeファイルが見つかりません: ' . $merge_file]);
     exit;
 }
 
@@ -78,6 +81,7 @@ $merge_card = json_decode(file_get_contents($merge_path), true);
 if ($main_card === null || $merge_card === null) {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Failed to parse card JSON.']);
+    echo json_encode(['status' => 'error', 'message' => 'カードのJSON解析に失敗しました。']);
     exit;
 }
 
@@ -103,9 +107,29 @@ $hash      = substr($new_card['header']['content_hash'], 0, 8);
 $new_filename = "{$safe_work}_{$safe_name}_{$branch}_{$hash}.json";
 
 // ===== 書き出し先ディレクトリの準備 =====
+//既存ディレクトリのパーミッションを確認し、必要なら775で上書きを試みる
 
 foreach ([DIR_MERGE_CONF, DIR_MAIN_DB_OLD] as $dir) {
     if (!is_dir($dir)) mkdir($dir, 0775, true);
+    elseif (!is_writable($dir)) {
+        if (!chmod($dir, 0775)) {
+            http_response_code(500);
+            echo json_encode(['status' => 'error', 'message' => "Directory not writable: {$dir}"]);
+            //merge_builder_status.jsonへ記録
+
+            $status_path = __DIR__ . '/merge_builder_status.json';
+             $status_data = [
+                 'status' => 'error',
+                 'message' => "Directory not writable: {$dir}",
+                 'msg' => "ディレクトリのパーミッションを確認してください: {$dir}",
+                 'timestamp' => date('c'),
+             ];
+             file_put_contents($status_path, json_encode($status_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+            exit;
+        }
+    }
+
 }
 
 // ===== 1. 新カード → M_Confirmed/ =====
@@ -114,6 +138,18 @@ $dest = DIR_MERGE_CONF . '/' . $new_filename;
 if (file_put_contents($dest, json_encode($new_card, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) === false) {
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'Failed to write new card.']);
+    echo json_encode(['status' => 'error', 'message' => '新カードの書き出しに失敗しました。']);
+
+    //merge_builder_status.jsonへ記録
+     $status_path = __DIR__ . '/merge_builder_status.json';
+     $status_data = [
+         'status' => 'error',
+         'message' => 'Failed to write new card.',
+         'msg' => "新カードの書き出しに失敗しました: {$dest}",
+         'timestamp' => date('c'),
+     ];
+     file_put_contents($status_path, json_encode($status_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
     exit;
 }
 
@@ -122,6 +158,17 @@ if (file_put_contents($dest, json_encode($new_card, JSON_PRETTY_PRINT | JSON_UNE
 if (!rename($maindb_path, DIR_MAIN_DB_OLD . '/' . basename($maindb_file))) {
     // 書き込みは成功しているのでロールバックはしない、エラーログのみ
     error_log('merge_builder: failed to move maindb file to OLD: ' . $maindb_file);
+
+    //merge_builder_status.jsonへ記録
+     $status_path = __DIR__ . '/merge_builder_status.json';
+     $status_data = [
+         'status' => 'error',
+         'message' => 'Failed to move mainDB file to OLD: ' . $maindb_file,
+         'msg' => "mainDBの旧カードをOLDディレクトリに移動できませんでした: {$maindb_file}",
+         'timestamp' => date('c'),
+     ];
+     file_put_contents($status_path, json_encode($status_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
 }
 
 // ===== 3. 03b_merge内の差分ファイル削除 =====
@@ -141,12 +188,19 @@ if (file_exists($group_list_path)) {
 }
 
 // ===== 正常終了 =====
+//merge_builder_status.jsonへ記録
 
-echo json_encode([
-    'status'   => 'ok',
+$status_path = __DIR__ . '/merge_builder_status.json';
+$status_data = [
+    'status' => 'ok',
+    'message' => 'Merge completed successfully.',
+    'msg' => "マージが正常に完了しました: {$new_filename}",
     'new_file' => $new_filename,
-]);
-exit;
+    'timestamp' => date('c'),
+];
+file_put_contents($status_path, json_encode($status_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+echo json_encode(['status' => 'ok', 'new_file' => $new_filename]);
+
 
 
 // ============================================================
