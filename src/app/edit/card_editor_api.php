@@ -31,6 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if ($mode !== 'load' || empty($filename)) {
         http_response_code(400);
         echo json_encode(['status' => 'error', 'message' => 'mode=load&filename required.']);
+        echo json_encode(['status' => 'error', 'message' => 'mode=load&filename が必要です。']);
         exit;
     }
 
